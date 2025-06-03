@@ -66,28 +66,28 @@ You can use the following environment variables:
 
 This MCP server provides 9 database operations:
 
-| Fonksiyon | Açıklama |
-|-----------|----------|
-| `connect_database` | SQL Server'a bağlantı kurar |
-| `connection_status` | Bağlantı durumunu kontrol eder |
-| `disconnect_database` | Bağlantıyı kapatır |
-| `execute_query` | SQL sorgusu çalıştırır (SELECT, INSERT, UPDATE, DELETE) |
-| `execute_procedure` | Stored procedure çalıştırır |
-| `get_schema` | Veritabanı şemasını listeler (tablolar, views, procedures) |
-| `describe_table` | Tablo yapısını detaylı gösterir |
-| `list_databases` | Tüm veritabanlarını listeler |
-| `get_table_data` | Tablo verilerini sayfalama ile getirir |
+| Function | Description |
+|----------|-------------|
+| `connect_database` | Establishes connection to SQL Server |
+| `connection_status` | Checks connection status |
+| `disconnect_database` | Closes the connection |
+| `execute_query` | Executes SQL queries (SELECT, INSERT, UPDATE, DELETE) |
+| `execute_procedure` | Executes stored procedures |
+| `get_schema` | Lists database schema (tables, views, procedures) |
+| `describe_table` | Shows detailed table structure |
+| `list_databases` | Lists all databases |
+| `get_table_data` | Retrieves table data with pagination |
 
-## Güvenlik Notları
+## Security Notes
 
-- Hassas bilgileri (şifreler) environment variable'lar ile yönetin
-- Üretim ortamında güçlü şifreler kullanın
-- SSL/TLS bağlantısı için sertifikaları doğrulayın
-- SQL injection koruması için parametreli sorgular kullanın
+- Manage sensitive information (passwords) using environment variables
+- Use strong passwords in production environments
+- Verify certificates for SSL/TLS connections
+- Use parameterized queries for SQL injection protection
 
 ## GitHub Repository
 
-Bu proje GitHub'da da mevcuttur:
+This project is also available on GitHub:
 - **Repository**: [BYMCS/mssql-mcp](https://github.com/BYMCS/mssql-mcp)
-- **Issues**: Hata bildirimleri ve öneriler için
-- **Releases**: Sürüm notları ve indirmeler
+- **Issues**: For bug reports and suggestions
+- **Releases**: Release notes and downloads
