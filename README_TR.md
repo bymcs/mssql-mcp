@@ -1,16 +1,25 @@
 # MS SQL Server MCP Server
 
-Microsoft SQL Server için Model Context Protocol (MCP) sunucusu. Claude Desktop, Cursor, Windsurf ve VS Code gibi IDE'lerde kullanılmak üzere tasarlanmıştır.
+Microsoft SQL Server için Model Context Protocol (MCP) sunucusu. Claude Desktop, Cursor, Windsurf ve VS Code gibi IDE'lerde kullanılmak üzere gelişmiş güvenlik özellikleriyle tasarlanmıştır.
+
+## 🆕 Sürüm 1.0.2 - Güvenlik & Güvenilirlik Güncellemeleri
+
+- ✅ **SQL Injection Koruması**: Gelişmiş pattern tespiti ve parametreli sorgu zorlaması
+- ✅ **Giriş Doğrulama**: Tablo adları, şema adları ve sorgu parametreleri için katı doğrulama
+- ✅ **Güncel Bağımlılıklar**: En son @modelcontextprotocol/sdk (v1.17.1)
+- ✅ **Daha İyi Hata Yönetimi**: Kapsamlı loglama ve zarif hata kurtarma
+- ✅ **Performans İzleme**: Sorgu çalıştırma süresi takibi
+- ✅ **Bağlantı Güvenliği**: Gelişmiş SSL/TLS ayarları ve bağlantı havuzu
 
 ## Özellikler
 
 - 🔗 **Veritabanı Bağlantı Yönetimi**: MS SQL Server'a güvenli bağlantı
-- 📊 **SQL Sorgu Çalıştırma**: Parametreli sorgular ve DDL/DML işlemleri
+- 📊 **SQL Sorgu Çalıştırma**: Injection koruması ile parametreli sorgular ve DDL/DML işlemleri
 - 🗂️ **Şema Yönetimi**: Tablolar, görünümler, stored procedure'lar
 - 📋 **Tablo İşlemleri**: Yapı inceleme, veri görüntüleme, sayfalama
 - ⚙️ **Stored Procedure**: Parametrelerle çalıştırma
 - 🏢 **Veritabanı Listeleme**: Instance'daki tüm veritabanları
-- 🔒 **Güvenlik**: Environment variable desteği
+- 🔒 **Güvenlik**: SQL injection koruması, giriş doğrulama
 
 ## IDE Konfigürasyonu
 

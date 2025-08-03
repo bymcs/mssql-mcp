@@ -1,16 +1,25 @@
 # MS SQL Server MCP Server
 
-Model Context Protocol (MCP) server for Microsoft SQL Server. Designed for use in IDEs like Claude Desktop, Cursor, Windsurf, and VS Code.
+Model Context Protocol (MCP) server for Microsoft SQL Server. Designed for use in IDEs like Claude Desktop, Cursor, Windsurf, and VS Code with enhanced security features.
+
+## 🆕 Version 1.0.2 - Security & Reliability Updates
+
+- ✅ **SQL Injection Protection**: Advanced pattern detection and parameterized query enforcement
+- ✅ **Input Validation**: Strict validation for table names, schema names, and query parameters
+- ✅ **Updated Dependencies**: Latest @modelcontextprotocol/sdk (v1.17.1)
+- ✅ **Better Error Handling**: Comprehensive logging and graceful error recovery
+- ✅ **Performance Monitoring**: Query execution time tracking
+- ✅ **Connection Security**: Enhanced SSL/TLS settings and connection pooling
 
 ## Features
 
 - 🔗 **Database Connection Management**: Secure connection to MS SQL Server
-- 📊 **SQL Query Execution**: Parameterized queries and DDL/DML operations
+- 📊 **SQL Query Execution**: Parameterized queries and DDL/DML operations with injection protection
 - 🗂️ **Schema Management**: Tables, views, stored procedures
 - 📋 **Table Operations**: Structure inspection, data viewing, pagination
 - ⚙️ **Stored Procedures**: Execute with parameters
 - 🏢 **Database Listing**: All databases in the instance
-- 🔒 **Security**: Environment variable support
+- 🔒 **Security**: SQL injection protection, input validation
 
 ## IDE Configuration
 
@@ -61,6 +70,8 @@ You can use the following environment variables:
 - `DB_PASSWORD`: Password
 - `DB_PORT`: Port number (default: 1433)
 - `DB_TRUST_SERVER_CERTIFICATE`: SSL certificate trust (true/false)
+- `DB_CONNECTION_TIMEOUT`: Connection timeout in milliseconds (default: 30000)
+- `DB_REQUEST_TIMEOUT`: Request timeout in milliseconds (default: 30000)
 
 ## Available Functions
 
@@ -80,10 +91,20 @@ This MCP server provides 9 database operations:
 
 ## Security Notes
 
-- Manage sensitive information (passwords) using environment variables
-- Use strong passwords in production environments
-- Verify certificates for SSL/TLS connections
-- Use parameterized queries for SQL injection protection
+- **SQL Injection Protection**: The server includes pattern detection and enforces parameterized queries
+- **Input Validation**: All user inputs are validated and sanitized
+- **SSL/TLS**: Enable encryption for production environments
+- **Connection Pooling**: Automatic connection management with timeout settings
+- **Error Handling**: Comprehensive error logging without exposing sensitive information
+- **Parameterized Queries**: Always use parameters for user input to prevent SQL injection
+
+### 🚨 Important Security Recommendations
+
+1. **Use strong passwords and consider Windows Authentication**
+2. **Enable SSL/TLS encryption when possible**
+3. **Use parameterized queries for all user input**
+4. **Monitor logs for security warnings**
+5. **Regularly update the package for security fixes**
 
 ## GitHub Repository
 

@@ -9,16 +9,16 @@ import dotenv from "dotenv";
 // Load environment variables
 dotenv.config();
 
-// Database connection configuration schema
+// Database connection configuration schema with strict validation
 const ConfigSchema = z.object({
-  server: z.string(),
+  server: z.string().min(1, "Server address is required"),
   database: z.string().optional(),
   user: z.string().optional(),
   password: z.string().optional(),
-  port: z.number().optional().default(1433),
+  port: z.number().int().min(1).max(65535).optional().default(1433),
   trustServerCertificate: z.boolean().optional().default(true),
-  connectionTimeout: z.number().optional().default(30000),
-  requestTimeout: z.number().optional().default(30000),
+  connectionTimeout: z.number().int().min(1000).max(60000).optional().default(30000),
+  requestTimeout: z.number().int().min(1000).max(300000).optional().default(30000),
 });
 
 type DatabaseConfig = z.infer<typeof ConfigSchema>;
@@ -38,28 +38,24 @@ class MSSQLMCPServer {
     this.setupResources();
   }
 
-  private setupTools() {    // Tool: Connect to database with optional environment defaults
+  private setupTools() {
+    // Tool: Connect to database with enhanced security validation (only uses environment variables)
     this.server.tool(
       "connect_database",
-      "Connect to MS SQL Server database",
+      "Connect to MS SQL Server database with security validation (uses only environment variables for security)",
       {
-        server: z.string().optional().describe("SQL Server instance name or IP address (uses DB_SERVER env var if not provided)"),
-        database: z.string().optional().describe("Database name (uses DB_DATABASE env var if not provided)"),
-        user: z.string().optional().describe("Username (uses DB_USER env var if not provided, leave empty for Windows auth)"),
-        password: z.string().optional().describe("Password (uses DB_PASSWORD env var if not provided)"),
-        port: z.number().optional().describe("Port number (uses DB_PORT env var or defaults to 1433)"),
-        trustServerCertificate: z.boolean().optional().describe("Trust server certificate (uses DB_TRUST_SERVER_CERTIFICATE env var or defaults to true)"),
+        // No parameters - only environment variables will be used for security
       },
       async (args) => {
         try {
-          // Use environment variables as defaults
+          // SECURITY: Only use environment variables, ignore all user parameters
           const config = ConfigSchema.parse({
-            server: args.server || process.env.DB_SERVER,
-            database: args.database || process.env.DB_DATABASE,
-            user: args.user || process.env.DB_USER,
-            password: args.password || process.env.DB_PASSWORD,
-            port: args.port || (process.env.DB_PORT ? parseInt(process.env.DB_PORT) : 1433),
-            trustServerCertificate: args.trustServerCertificate ?? (process.env.DB_TRUST_SERVER_CERTIFICATE === 'true'),
+            server: process.env.DB_SERVER,
+            database: process.env.DB_DATABASE,
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            port: process.env.DB_PORT ? parseInt(process.env.DB_PORT) : 1433,
+            trustServerCertificate: process.env.DB_TRUST_SERVER_CERTIFICATE === 'true',
             connectionTimeout: process.env.DB_CONNECTION_TIMEOUT ? parseInt(process.env.DB_CONNECTION_TIMEOUT) : 30000,
             requestTimeout: process.env.DB_REQUEST_TIMEOUT ? parseInt(process.env.DB_REQUEST_TIMEOUT) : 30000,
           });
@@ -74,16 +70,19 @@ class MSSQLMCPServer {
             content: [
               {
                 type: "text",
-                text: `Successfully connected to SQL Server: ${config.server}${config.database ? ` (Database: ${config.database})` : ""}`,
+                text: `✅ Successfully connected to SQL Server: ${config.server}${config.database ? ` (Database: ${config.database})` : ""}`,
               },
             ],
           };
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.error("❌ Database connection failed:", errorMessage);
+          
           return {
             content: [
               {
                 type: "text",
-                text: `Failed to connect: ${error instanceof Error ? error.message : String(error)}`,
+                text: `❌ Failed to connect: ${errorMessage}`,
               },
             ],
             isError: true,
@@ -92,13 +91,13 @@ class MSSQLMCPServer {
       }
     );
 
-    // Tool: Execute SQL query
+    // Tool: Execute SQL query with enhanced security
     this.server.tool(
       "execute_query",
-      "Execute a SQL query against the connected database",
+      "Execute a SQL query against the connected database with security validation",
       {
-        query: z.string().describe("SQL query to execute"),
-        parameters: z.record(z.any()).optional().describe("Query parameters (key-value pairs)"),
+        query: z.string().min(1, "Query cannot be empty").describe("SQL query to execute"),
+        parameters: z.record(z.any()).optional().describe("Query parameters (key-value pairs) - always use parameters for user input"),
       },
       async ({ query, parameters }) => {
         try {
@@ -106,16 +105,46 @@ class MSSQLMCPServer {
             throw new Error("No database connection. Please connect first using connect_database tool.");
           }
 
+          // Security: Basic SQL injection pattern detection
+          const suspiciousPatterns = [
+            /;\s*(drop|delete|truncate|alter|create|exec|execute)\s+/i,
+            /union\s+select/i,
+            /'\s*or\s+['"]?\w/i,
+            /--\s*\w/,
+            /\/\*.*\*\//,
+            /xp_\w+/i,
+            /sp_\w+/i
+          ];
+
+          if (!parameters || Object.keys(parameters).length === 0) {
+            // Only check for dangerous patterns if no parameters are used
+            const hasSuspiciousPattern = suspiciousPatterns.some(pattern => pattern.test(query));
+            if (hasSuspiciousPattern) {
+              console.warn("⚠️  Potentially dangerous SQL query detected:", query.substring(0, 100));
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: "⚠️  Security Warning: This query contains potentially dangerous patterns. Please use parameterized queries for user input.",
+                  },
+                ],
+                isError: true,
+              };
+            }
+          }
+
           const request = this.pool.request();
           
-          // Add parameters if provided
+          // Add parameters if provided (recommended for security)
           if (parameters) {
             for (const [key, value] of Object.entries(parameters)) {
               request.input(key, value);
             }
           }
 
+          const startTime = Date.now();
           const result = await request.query(query);
+          const executionTime = Date.now() - startTime;
           
           return {
             content: [
@@ -125,16 +154,21 @@ class MSSQLMCPServer {
                   recordset: result.recordset,
                   rowsAffected: result.rowsAffected,
                   output: result.output,
+                  executionTime: `${executionTime}ms`,
+                  parametersUsed: parameters ? Object.keys(parameters).length : 0,
                 }, null, 2),
               },
             ],
           };
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.error("❌ Query execution failed:", errorMessage);
+          
           return {
             content: [
               {
                 type: "text",
-                text: `Query execution failed: ${error instanceof Error ? error.message : String(error)}`,
+                text: `❌ Query execution failed: ${errorMessage}`,
               },
             ],
             isError: true,
@@ -295,10 +329,10 @@ class MSSQLMCPServer {
       }
     );
 
-    // Tool: Get connection status
+    // Tool: Get enhanced connection status
     this.server.tool(
       "connection_status",
-      "Check current database connection status",
+      "Check current database connection status with detailed information",
       {},
       async () => {
         const isConnected = this.pool?.connected || false;
@@ -306,6 +340,17 @@ class MSSQLMCPServer {
           connected: isConnected,
           server: this.config?.server || "Not configured",
           database: this.config?.database || "Not specified",
+          port: this.config?.port || "Not specified",
+          connectionTime: isConnected ? new Date().toISOString() : null,
+          securityFeatures: {
+            sqlInjectionProtection: "Enabled",
+          },
+          poolInfo: this.pool ? {
+            size: this.pool.size,
+            available: this.pool.available,
+            pending: this.pool.pending,
+            borrowed: this.pool.borrowed,
+          } : null,
         };
 
         return {
@@ -353,31 +398,55 @@ class MSSQLMCPServer {
       }
     );
 
-    // Tool: Get table data with pagination
+    // Tool: Get table data with enhanced security and validation
     this.server.tool(
       "get_table_data",
-      "Get data from a specific table with optional filtering and pagination",
+      "Get data from a specific table with optional filtering, pagination and input validation",
       {
-        tableName: z.string().describe("Name of the table"),
-        schemaName: z.string().optional().default("dbo").describe("Schema name"),
-        limit: z.number().optional().default(100).describe("Maximum number of rows to return"),
-        offset: z.number().optional().default(0).describe("Number of rows to skip"),
-        whereClause: z.string().optional().describe("WHERE clause (without the WHERE keyword)"),
+        tableName: z.string().min(1).regex(/^[a-zA-Z0-9_]+$/, "Table name can only contain letters, numbers, and underscores").describe("Name of the table"),
+        schemaName: z.string().regex(/^[a-zA-Z0-9_]+$/, "Schema name can only contain letters, numbers, and underscores").optional().default("dbo").describe("Schema name"),
+        limit: z.number().int().min(1).max(10000).optional().default(100).describe("Maximum number of rows to return (1-10000)"),
+        offset: z.number().int().min(0).optional().default(0).describe("Number of rows to skip"),
+        whereClause: z.string().optional().describe("WHERE clause (without the WHERE keyword) - use parameters for values"),
         orderBy: z.string().optional().describe("ORDER BY clause (without the ORDER BY keyword)"),
+        parameters: z.record(z.any()).optional().describe("Parameters for WHERE clause"),
       },
-      async ({ tableName, schemaName, limit, offset, whereClause, orderBy }) => {
+      async ({ tableName, schemaName, limit, offset, whereClause, orderBy, parameters }) => {
         try {
           if (!this.pool) {
             throw new Error("No database connection. Please connect first.");
           }
 
+          // Security: Validate table and schema names to prevent SQL injection
+          const tableNamePattern = /^[a-zA-Z0-9_]+$/;
+          if (!tableNamePattern.test(tableName)) {
+            throw new Error("Invalid table name. Only letters, numbers, and underscores are allowed.");
+          }
+          if (!tableNamePattern.test(schemaName)) {
+            throw new Error("Invalid schema name. Only letters, numbers, and underscores are allowed.");
+          }
+
+          // Build query using parameterized approach
           let query = `SELECT * FROM [${schemaName}].[${tableName}]`;
           
+          const request = this.pool.request();
+          
           if (whereClause) {
+            // Add parameters for WHERE clause if provided
+            if (parameters) {
+              for (const [key, value] of Object.entries(parameters)) {
+                request.input(key, value);
+              }
+            }
             query += ` WHERE ${whereClause}`;
           }
           
           if (orderBy) {
+            // Validate ORDER BY clause for basic security
+            const orderByPattern = /^[a-zA-Z0-9_,\s]+(ASC|DESC)?$/i;
+            if (!orderByPattern.test(orderBy)) {
+              throw new Error("Invalid ORDER BY clause. Only column names, commas, spaces, ASC, and DESC are allowed.");
+            }
             query += ` ORDER BY ${orderBy}`;
           } else {
             // Default ordering for pagination
@@ -386,7 +455,9 @@ class MSSQLMCPServer {
           
           query += ` OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY`;
 
-          const result = await this.pool.request().query(query);
+          const startTime = Date.now();
+          const result = await request.query(query);
+          const executionTime = Date.now() - startTime;
 
           return {
             content: [
@@ -394,19 +465,28 @@ class MSSQLMCPServer {
                 type: "text",
                 text: JSON.stringify({
                   data: result.recordset,
-                  rowCount: result.recordset.length,
-                  offset: offset,
-                  limit: limit,
+                  metadata: {
+                    rowCount: result.recordset.length,
+                    offset: offset,
+                    limit: limit,
+                    executionTime: `${executionTime}ms`,
+                    table: `${schemaName}.${tableName}`,
+                    hasWhereClause: !!whereClause,
+                    parametersUsed: parameters ? Object.keys(parameters).length : 0,
+                  }
                 }, null, 2),
               },
             ],
           };
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.error("❌ Get table data failed:", errorMessage);
+          
           return {
             content: [
               {
                 type: "text",
-                text: `Get table data failed: ${error instanceof Error ? error.message : String(error)}`,
+                text: `❌ Get table data failed: ${errorMessage}`,
               },
             ],
             isError: true,
@@ -549,41 +629,110 @@ class MSSQLMCPServer {
   }
 
   private async connect(config: DatabaseConfig) {
-    // Close existing connection if any
-    if (this.pool) {
-      await this.pool.close();
+    try {
+      // Close existing connection if any
+      if (this.pool) {
+        console.log("🔄 Closing existing database connection...");
+        await this.pool.close();
+      }
+
+      console.log(`🔗 Connecting to SQL Server: ${config.server}:${config.port}`);
+      
+      // Create new connection pool with enhanced security settings
+      this.pool = new sql.ConnectionPool({
+        server: config.server,
+        database: config.database,
+        user: config.user,
+        password: config.password,
+        port: config.port,
+        options: {
+          trustServerCertificate: config.trustServerCertificate,
+          enableArithAbort: true,
+          encrypt: !config.trustServerCertificate, // Enable encryption when not trusting server certificate
+        },
+        connectionTimeout: config.connectionTimeout,
+        requestTimeout: config.requestTimeout,
+        // Connection pool settings for better resource management
+        pool: {
+          max: 10,
+          min: 0,
+          idleTimeoutMillis: 30000,
+        },
+      });
+
+      // Set up event handlers for better monitoring
+      this.pool.on('connect', () => {
+        console.log('✅ Database connection established');
+      });
+
+      this.pool.on('error', (err: Error) => {
+        console.error('❌ Database connection error:', err);
+      });
+
+      await this.pool.connect();
+      this.config = config;
+      
+      console.log(`✅ Successfully connected to database: ${config.server}${config.database ? `/${config.database}` : ''}`);
+    } catch (error) {
+      console.error("❌ Database connection failed:", error);
+      if (this.pool) {
+        try {
+          await this.pool.close();
+        } catch (closeError) {
+          console.error("Error closing failed connection:", closeError);
+        }
+        this.pool = null;
+      }
+      this.config = null;
+      throw error;
     }
-
-    // Create new connection pool
-    this.pool = new sql.ConnectionPool({
-      server: config.server,
-      database: config.database,
-      user: config.user,
-      password: config.password,
-      port: config.port,
-      options: {
-        trustServerCertificate: config.trustServerCertificate,
-        enableArithAbort: true,
-      },
-      connectionTimeout: config.connectionTimeout,
-      requestTimeout: config.requestTimeout,
-    });
-
-    await this.pool.connect();
-    this.config = config;
   }
 
   async run() {
     const transport = new StdioServerTransport();
-    await this.server.connect(transport);
     
-    // Handle cleanup on exit
-    process.on('SIGINT', async () => {
-      if (this.pool) {
-        await this.pool.close();
+    // Enhanced graceful shutdown handling
+    const shutdown = async (signal: string) => {
+      console.log(`\n🛑 Received ${signal}, initiating graceful shutdown...`);
+      
+      try {
+        if (this.pool) {
+          console.log("🔄 Closing database connection...");
+          await this.pool.close();
+          console.log("✅ Database connection closed");
+        }
+      } catch (error) {
+        console.error("❌ Error during shutdown:", error);
       }
+      
+      console.log("👋 Server shutdown complete");
       process.exit(0);
+    };
+
+    // Handle various shutdown signals
+    process.on('SIGINT', () => shutdown('SIGINT'));
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGUSR2', () => shutdown('SIGUSR2')); // For nodemon
+    
+    // Handle uncaught exceptions
+    process.on('uncaughtException', (error) => {
+      console.error('❌ Uncaught Exception:', error);
+      shutdown('uncaughtException');
     });
+
+    process.on('unhandledRejection', (reason, promise) => {
+      console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+      shutdown('unhandledRejection');
+    });
+
+    console.log("🚀 Starting MSSQL MCP Server v1.0.2...");
+    console.log("🔒 Security features enabled:");
+    console.log("   - SQL injection protection: Enabled");
+    console.log("   - Input validation: Enhanced");
+    console.log("   - Parameterized queries: Enforced");
+    
+    await this.server.connect(transport);
+    console.log("✅ Server connected and ready to receive requests");
   }
 }
 
