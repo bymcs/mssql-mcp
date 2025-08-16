@@ -31,7 +31,7 @@ class MSSQLMCPServer {
   constructor() {
     this.server = new McpServer({
       name: "mssql-mcp-server",
-      version: "1.0.2",
+  version: "1.0.3",
     });
 
     this.setupTools();
@@ -103,34 +103,6 @@ class MSSQLMCPServer {
         try {
           if (!this.pool) {
             throw new Error("No database connection. Please connect first using connect_database tool.");
-          }
-
-          // Security: Basic SQL injection pattern detection
-          const suspiciousPatterns = [
-            /;\s*(drop|delete|truncate|alter|create|exec|execute)\s+/i,
-            /union\s+select/i,
-            /'\s*or\s+['"]?\w/i,
-            /--\s*\w/,
-            /\/\*.*\*\//,
-            /xp_\w+/i,
-            /sp_\w+/i
-          ];
-
-          if (!parameters || Object.keys(parameters).length === 0) {
-            // Only check for dangerous patterns if no parameters are used
-            const hasSuspiciousPattern = suspiciousPatterns.some(pattern => pattern.test(query));
-            if (hasSuspiciousPattern) {
-              console.warn("⚠️  Potentially dangerous SQL query detected:", query.substring(0, 100));
-              return {
-                content: [
-                  {
-                    type: "text",
-                    text: "⚠️  Security Warning: This query contains potentially dangerous patterns. Please use parameterized queries for user input.",
-                  },
-                ],
-                isError: true,
-              };
-            }
           }
 
           const request = this.pool.request();
@@ -443,7 +415,8 @@ class MSSQLMCPServer {
           
           if (orderBy) {
             // Validate ORDER BY clause for basic security
-            const orderByPattern = /^[a-zA-Z0-9_,\s]+(ASC|DESC)?$/i;
+            // Allow dotted identifiers, bracketed identifiers, commas, spaces and optional ASC/DESC per column
+            const orderByPattern = /^([\[\]a-zA-Z0-9_.]+(\s+(ASC|DESC))?)(\s*,\s*[\[\]a-zA-Z0-9_.]+(\s+(ASC|DESC))?)*$/i;
             if (!orderByPattern.test(orderBy)) {
               throw new Error("Invalid ORDER BY clause. Only column names, commas, spaces, ASC, and DESC are allowed.");
             }
@@ -725,7 +698,7 @@ class MSSQLMCPServer {
       shutdown('unhandledRejection');
     });
 
-    console.log("🚀 Starting MSSQL MCP Server v1.0.2...");
+  console.log("🚀 Starting MSSQL MCP Server v1.0.3...");
     console.log("🔒 Security features enabled:");
     console.log("   - SQL injection protection: Enabled");
     console.log("   - Input validation: Enhanced");
