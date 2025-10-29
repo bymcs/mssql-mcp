@@ -31,7 +31,7 @@ class MSSQLMCPServer {
   constructor() {
     this.server = new McpServer({
       name: "mssql-mcp-server",
-  version: "1.0.3",
+  version: "2.0.3",
     });
 
     this.setupTools();
@@ -605,11 +605,11 @@ class MSSQLMCPServer {
     try {
       // Close existing connection if any
       if (this.pool) {
-        console.log("🔄 Closing existing database connection...");
+        console.error("Closing existing connection...");
         await this.pool.close();
       }
 
-      console.log(`🔗 Connecting to SQL Server: ${config.server}:${config.port}`);
+      console.error(`Connecting to ${config.server}:${config.port}`);
       
       // Create new connection pool with enhanced security settings
       this.pool = new sql.ConnectionPool({
@@ -635,19 +635,19 @@ class MSSQLMCPServer {
 
       // Set up event handlers for better monitoring
       this.pool.on('connect', () => {
-        console.log('✅ Database connection established');
+        console.error('Database connected');
       });
 
       this.pool.on('error', (err: Error) => {
-        console.error('❌ Database connection error:', err);
+        console.error('Database error:', err);
       });
 
       await this.pool.connect();
       this.config = config;
       
-      console.log(`✅ Successfully connected to database: ${config.server}${config.database ? `/${config.database}` : ''}`);
+      console.error(`Connected to ${config.server}${config.database ? `/${config.database}` : ''}`);
     } catch (error) {
-      console.error("❌ Database connection failed:", error);
+      console.error("Connection failed:", error);
       if (this.pool) {
         try {
           await this.pool.close();
@@ -666,19 +666,19 @@ class MSSQLMCPServer {
     
     // Enhanced graceful shutdown handling
     const shutdown = async (signal: string) => {
-      console.log(`\n🛑 Received ${signal}, initiating graceful shutdown...`);
-      
+      console.error(`\nShutting down (${signal})...`);
+
       try {
         if (this.pool) {
-          console.log("🔄 Closing database connection...");
+          console.error("Closing database connection...");
           await this.pool.close();
-          console.log("✅ Database connection closed");
+          console.error("Database connection closed");
         }
       } catch (error) {
-        console.error("❌ Error during shutdown:", error);
+        console.error("Shutdown error:", error);
       }
-      
-      console.log("👋 Server shutdown complete");
+
+      console.error("Server stopped");
       process.exit(0);
     };
 
@@ -689,23 +689,18 @@ class MSSQLMCPServer {
     
     // Handle uncaught exceptions
     process.on('uncaughtException', (error) => {
-      console.error('❌ Uncaught Exception:', error);
+      console.error('Uncaught Exception:', error);
       shutdown('uncaughtException');
     });
 
     process.on('unhandledRejection', (reason, promise) => {
-      console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+      console.error('Unhandled Rejection:', reason);
       shutdown('unhandledRejection');
     });
 
-  console.log("🚀 Starting MSSQL MCP Server v1.0.3...");
-    console.log("🔒 Security features enabled:");
-    console.log("   - SQL injection protection: Enabled");
-    console.log("   - Input validation: Enhanced");
-    console.log("   - Parameterized queries: Enforced");
-    
+  console.error("MSSQL MCP Server v2.0.3 starting...");
     await this.server.connect(transport);
-    console.log("✅ Server connected and ready to receive requests");
+    console.error("Server ready");
   }
 }
 
