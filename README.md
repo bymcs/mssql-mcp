@@ -1,6 +1,6 @@
-# MS SQL Server MCP Server v2.0.3
+# MS SQL Server MCP Server v2.1.1
 
-🚀 **Smart Trust-Based Model Context Protocol (MCP) server** for Microsoft SQL Server with intelligent auto-connection and AI-friendly design.
+🚀 **Model Context Protocol (MCP) server** for Microsoft SQL Server - compatible with Claude Desktop, Cursor, Windsurf and VS Code.
 
 ## 🚀 Quick Start
 
@@ -24,6 +24,7 @@ npm install -g mssql-mcp
         "DB_DATABASE": "your-database",
         "DB_USER": "your-username",
         "DB_PASSWORD": "your-password",
+        "DB_ENCRYPT": "true",
         "DB_TRUST_SERVER_CERTIFICATE": "true"
       }
     }
@@ -43,6 +44,7 @@ npm install -g mssql-mcp
         "DB_DATABASE": "your-database",
         "DB_USER": "your-username",
         "DB_PASSWORD": "your-password",
+        "DB_ENCRYPT": "true",
         "DB_TRUST_SERVER_CERTIFICATE": "true"
       }
     }
@@ -50,77 +52,108 @@ npm install -g mssql-mcp
 }
 ```
 
-> Replace with your actual database credentials. Server auto-connects using these.
+> Replace with your actual database credentials.
 
 ## 🛠️ Available Tools
 
 | Tool | Description |
 |------|-------------|
+| `connect_database` | Connect to database using environment variables |
+| `disconnect_database` | Close current database connection |
+| `connection_status` | Check connection state with pool info |
 | `execute_query` | Execute any SQL query with parameters |
 | `get_schema` | List database objects (tables, views, procedures) |
 | `describe_table` | Get detailed table structure |
 | `get_table_data` | Retrieve data with pagination |
 | `execute_procedure` | Execute stored procedures |
 | `list_databases` | List all databases |
-| `connection_status` | Check connection state |
-| `connect_database` | Manual connection (rarely needed) |
-| `disconnect_database` | Close connection |
-| `clear_cache` | Clear query cache |
-
-All tools auto-connect using environment variables.
 
 ## 🔧 Environment Variables
 
-| Variable | Required | Default |
-|----------|----------|---------|
-| `DB_SERVER` | ✅ | - |
-| `DB_DATABASE` | ✅ | - |
-| `DB_USER` | ✅ | - |
-| `DB_PASSWORD` | ✅ | - |
-| `DB_PORT` | ❌ | 1433 |
-| `DB_TRUST_SERVER_CERTIFICATE` | ❌ | true |
-| `DB_CONNECTION_TIMEOUT` | ❌ | 30000 |
-| `DB_REQUEST_TIMEOUT` | ❌ | 30000 |
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DB_SERVER` | ✅ | - | SQL Server hostname |
+| `DB_DATABASE` | ❌ | - | Database name |
+| `DB_USER` | ❌ | - | Username |
+| `DB_PASSWORD` | ❌ | - | Password |
+| `DB_PORT` | ❌ | 1433 | SQL Server port |
+| `DB_ENCRYPT` | ❌ | true | Enable TLS encryption (required for Azure SQL) |
+| `DB_TRUST_SERVER_CERTIFICATE` | ❌ | false | Trust self-signed certificates |
+| `DB_CONNECTION_TIMEOUT` | ❌ | 30000 | Connection timeout (ms) |
+| `DB_REQUEST_TIMEOUT` | ❌ | 30000 | Request timeout (ms) |
 
-## 🛡️ Security
+### Azure SQL Configuration
+For Azure SQL Database, use these settings:
+```json
+{
+  "DB_ENCRYPT": "true",
+  "DB_TRUST_SERVER_CERTIFICATE": "false"
+}
+```
 
-**✅ Supported:** All database operations (SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, DROP)
-
-**🚨 Blocked:** Server-level operations only (SHUTDOWN, XP_CMDSHELL, RECONFIGURE)
+### Local SQL Server (Self-signed cert)
+For local development with self-signed certificates:
+```json
+{
+  "DB_ENCRYPT": "true",
+  "DB_TRUST_SERVER_CERTIFICATE": "true"
+}
+```
 
 ## 🏆 Features
 
-- ✅ **Auto-Connection**: Environment-based, no manual steps
+- ✅ **MCP SDK 1.25.1**: Latest Model Context Protocol SDK
+- ✅ **Azure SQL Compatible**: TLS encryption enabled by default
 - ✅ **Complete SQL Support**: All database operations
-- ✅ **No Rate Limiting**: Natural workflow
-- ✅ **Query Caching**: 5-minute TTL for SELECT queries
+- ✅ **Parameterized Queries**: SQL injection protection
+- ✅ **Connection Pooling**: Efficient resource management
 - ✅ **Performance Monitoring**: Execution time tracking
-- ✅ **Latest MCP SDK**: v1.20.2 with 2025 protocol
-- ✅ **Clean Logging**: Minimal console output, MCP protocol compatible
+
+## 📋 Usage Examples
+
+### Connect to Database
+```
+Use the connect_database tool to establish a connection.
+```
+
+### Execute a Query
+```sql
+SELECT TOP 10 * FROM Customers WHERE Country = @country
+-- With parameters: { "country": "USA" }
+```
+
+### Get Table Schema
+```
+Use describe_table with tableName: "Customers" to see column details.
+```
 
 ## 🔍 Troubleshooting
 
-**❌ Auto-connection failed**
-- Set all required environment variables
-- Verify server accessibility and credentials
-- Check network connectivity
+**❌ Connection failed**
+- Verify all required environment variables are set
+- Check server accessibility and credentials
+- Ensure network connectivity to SQL Server
 
-**❌ SQL Security Alert**
-- Only server operations are blocked
-- Database operations should work normally
+**❌ SSL/Certificate errors**
+- For Azure SQL: Set `DB_ENCRYPT=true` (default)
+- For self-signed certs: Set `DB_TRUST_SERVER_CERTIFICATE=true`
+- For local dev without encryption: Set `DB_ENCRYPT=false`
 
 ## 📋 Version History
 
-### v2.0.3 - Latest
-- ✅ Updated documentation with modern styling
-- ✅ Improved troubleshooting section
-- ✅ Enhanced feature descriptions
+### v2.1.1 - Latest
+- ✅ Added `DB_ENCRYPT` environment variable (Issue #1)
+- ✅ Azure SQL Database compatibility improved
+- ✅ Encryption enabled by default (`DB_ENCRYPT=true`)
+- ✅ Fixed `DB_TRUST_SERVER_CERTIFICATE` default to `false`
 
-### v2.0.2 - Performance & Compatibility
-- ✅ Simplified logging for MCP protocol compatibility
-- ✅ All console output moved to stderr
-- ✅ Clean, professional log messages
-- ✅ Version bump to 2.0.2
+### v2.1.0
+- ✅ Updated to MCP SDK 1.25.1
+- ✅ Migrated to `registerTool()` / `registerResource()` API
+- ✅ Added tool titles for better UI display
+
+### v2.0.3
+- ✅ Documentation improvements
 
 ## 📄 License
 
@@ -133,4 +166,4 @@ MIT License
 
 ---
 
-**🎉 v2.0.3: Enhanced documentation and user experience**
+**🎉 v2.1.1: Azure SQL compatibility with DB_ENCRYPT support**
