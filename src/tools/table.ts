@@ -6,11 +6,12 @@ import { validateIdentifier, bracketIdentifier, validateOrderBy } from "../db/va
 import { buildSelectQuery, buildSelectWithWhereQuery } from "../db/query-builders.js";
 import { toActionableError, toolError, toolSuccess } from "../utils/errors.js";
 import { formatJson, truncatePayload } from "../utils/format.js";
+import { formatMarkdownTable } from "../utils/markdown.js";
 import { buildPaginationMeta, clampLimit } from "../utils/pagination.js";
 
 export function registerTableTools(server: McpServer): void {
   server.registerTool(
-    "describe_table_columns",
+    "mssql_describe_table_columns",
     {
       title: "Describe Table Columns",
       description:
@@ -19,10 +20,15 @@ export function registerTableTools(server: McpServer): void {
       inputSchema: {
         tableName: z.string().min(1).describe("Table name"),
         schemaName: z.string().optional().default("dbo").describe("Schema name (default: dbo)"),
+        response_format: z
+          .enum(["json", "markdown"])
+          .optional()
+          .default("json")
+          .describe("Output format: 'json' for structured data, 'markdown' for human-readable table"),
       },
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
-    async ({ tableName, schemaName }) => {
+    async ({ tableName, schemaName, response_format }) => {
       try {
         const pool = requirePool();
         validateIdentifier(tableName, "table name");
@@ -45,10 +51,18 @@ export function registerTableTools(server: McpServer): void {
           columns: result.recordset,
           table: `${schemaName}.${tableName}`,
         };
+
+        if (response_format === "markdown") {
+          const rows = result.recordset as Record<string, unknown>[];
+          return toolSuccess(
+            formatMarkdownTable(rows, `Columns: ${schemaName}.${tableName}`),
+            structured
+          );
+        }
         return toolSuccess(formatJson(structured), structured);
       } catch (err) {
         const msg = toActionableError(err);
-        console.error("describe_table_columns failed:", msg);
+        console.error("mssql_describe_table_columns failed:", msg);
         return toolError(`Table description failed: ${msg}`);
       }
     }
@@ -56,17 +70,18 @@ export function registerTableTools(server: McpServer): void {
 
   // Backward-compatible alias
   server.registerTool(
-    "describe_table",
+    "mssql_describe_table",
     {
-      title: "Describe Table (deprecated — use describe_table_columns)",
-      description: "Deprecated alias for describe_table_columns.",
+      title: "Describe Table (deprecated — use mssql_describe_table_columns)",
+      description: "Deprecated alias for mssql_describe_table_columns.",
       inputSchema: {
         tableName: z.string().min(1),
         schemaName: z.string().optional().default("dbo"),
+        response_format: z.enum(["json", "markdown"]).optional().default("json"),
       },
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
-    async ({ tableName, schemaName }) => {
+    async ({ tableName, schemaName, response_format }) => {
       try {
         const pool = requirePool();
         validateIdentifier(tableName, "table name");
@@ -83,7 +98,11 @@ export function registerTableTools(server: McpServer): void {
             WHERE TABLE_NAME = @tableName AND TABLE_SCHEMA = @schemaName
             ORDER BY ORDINAL_POSITION
           `);
-        return toolSuccess(formatJson(result.recordset ?? []));
+        const rows = result.recordset ?? [];
+        if (response_format === "markdown") {
+          return toolSuccess(formatMarkdownTable(rows as Record<string, unknown>[]));
+        }
+        return toolSuccess(formatJson(rows));
       } catch (err) {
         return toolError(`Table description failed: ${toActionableError(err)}`);
       }
@@ -93,7 +112,7 @@ export function registerTableTools(server: McpServer): void {
   const safeIdentifierPattern = /^[a-zA-Z_][a-zA-Z0-9_$#@]{0,127}$/;
 
   server.registerTool(
-    "read_table_rows",
+    "mssql_read_table_rows",
     {
       title: "Read Table Rows",
       description:
@@ -135,10 +154,15 @@ export function registerTableTools(server: McpServer): void {
           .record(z.union([z.string(), z.number(), z.boolean(), z.null()]))
           .optional()
           .describe("Values for WHERE clause @paramName placeholders"),
+        response_format: z
+          .enum(["json", "markdown"])
+          .optional()
+          .default("json")
+          .describe("Output format: 'json' for structured data, 'markdown' for human-readable table"),
       },
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
-    async ({ tableName, schemaName, columns, limit: rawLimit, offset, whereClause, orderBy, parameters }) => {
+    async ({ tableName, schemaName, columns, limit: rawLimit, offset, whereClause, orderBy, parameters, response_format }) => {
       try {
         const pool = requirePool();
         validateIdentifier(tableName, "table name");
@@ -174,10 +198,18 @@ export function registerTableTools(server: McpServer): void {
           structured.truncated = truncated;
           structured.truncation_message = truncation_message;
         }
+
+        if (response_format === "markdown") {
+          const rows = data as Record<string, unknown>[];
+          let text = formatMarkdownTable(rows, `${schemaName}.${tableName}`);
+          if (truncated) text += `\n\n> ⚠️ ${truncation_message}`;
+          text += `\n\n*${rows.length} rows · offset ${offset} · ${elapsed}ms*`;
+          return toolSuccess(text, structured);
+        }
         return toolSuccess(formatJson(structured), structured);
       } catch (err) {
         const msg = toActionableError(err);
-        console.error("read_table_rows failed:", msg);
+        console.error("mssql_read_table_rows failed:", msg);
         return toolError(`Read table rows failed: ${msg}`);
       }
     }
@@ -185,11 +217,11 @@ export function registerTableTools(server: McpServer): void {
 
   // Backward-compatible alias
   server.registerTool(
-    "get_table_data",
+    "mssql_get_table_data",
     {
-      title: "Get Table Data (deprecated — use read_table_rows)",
+      title: "Get Table Data (deprecated — use mssql_read_table_rows)",
       description:
-        "Deprecated alias for read_table_rows. Use read_table_rows instead. " +
+        "Deprecated alias for mssql_read_table_rows. Use mssql_read_table_rows instead. " +
         "⚠️ whereClause must use @paramName placeholders for all values.",
       inputSchema: {
         tableName: z
@@ -208,10 +240,11 @@ export function registerTableTools(server: McpServer): void {
         parameters: z
           .record(z.union([z.string(), z.number(), z.boolean(), z.null()]))
           .optional(),
+        response_format: z.enum(["json", "markdown"]).optional().default("json"),
       },
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
-    async ({ tableName, schemaName, limit: rawLimit, offset, whereClause, orderBy, parameters }) => {
+    async ({ tableName, schemaName, limit: rawLimit, offset, whereClause, orderBy, parameters, response_format }) => {
       try {
         const pool = requirePool();
         validateIdentifier(tableName, "table name");
@@ -245,6 +278,12 @@ export function registerTableTools(server: McpServer): void {
           structured.truncated = truncated;
           structured.truncation_message = truncation_message;
         }
+        if (response_format === "markdown") {
+          return toolSuccess(
+            formatMarkdownTable(data as Record<string, unknown>[]),
+            structured
+          );
+        }
         return toolSuccess(formatJson(structured), structured);
       } catch (err) {
         return toolError(`Get table data failed: ${toActionableError(err)}`);
@@ -252,3 +291,4 @@ export function registerTableTools(server: McpServer): void {
     }
   );
 }
+

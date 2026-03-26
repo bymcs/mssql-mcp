@@ -5,7 +5,7 @@ import { formatJson } from "../utils/format.js";
 
 export function registerStatusTool(server: McpServer): void {
   server.registerTool(
-    "connection_status",
+    "mssql_connection_status",
     {
       title: "Connection Status",
       description:

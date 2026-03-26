@@ -31,7 +31,7 @@
     "clean": "rimraf dist",
     "prepublishOnly": "npm run clean && npm run build",
     "typecheck": "tsc --noEmit",
-    "test": "node --test dist/tests/unit/validators.test.js dist/tests/unit/query-builders.test.js dist/tests/unit/tool-contracts.test.js",
+    "test": "node --test dist/tests/unit/validators.test.js dist/tests/unit/query-builders.test.js dist/tests/unit/tool-contracts.test.js dist/tests/unit/markdown.test.js",
     "ci": "npm run typecheck && npm run build && npm test"
   },
   "keywords": [

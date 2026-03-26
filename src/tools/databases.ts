@@ -3,11 +3,12 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requirePool } from "../db/connection.js";
 import { toActionableError, toolError, toolSuccess } from "../utils/errors.js";
 import { formatJson } from "../utils/format.js";
+import { formatMarkdownTable } from "../utils/markdown.js";
 import { buildPaginationMeta, clampLimit } from "../utils/pagination.js";
 
 export function registerDatabasesTools(server: McpServer): void {
   server.registerTool(
-    "list_databases",
+    "mssql_list_databases",
     {
       title: "List Databases",
       description:
@@ -16,10 +17,15 @@ export function registerDatabasesTools(server: McpServer): void {
       inputSchema: {
         limit: z.number().int().min(1).max(200).optional().default(20).describe("Max databases (default 20)"),
         offset: z.number().int().min(0).optional().default(0).describe("Skip N databases"),
+        response_format: z
+          .enum(["json", "markdown"])
+          .optional()
+          .default("json")
+          .describe("Output format: 'json' for structured data, 'markdown' for human-readable table"),
       },
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
-    async ({ limit: rawLimit, offset }) => {
+    async ({ limit: rawLimit, offset, response_format }) => {
       try {
         const pool = requirePool();
         const limit = clampLimit(rawLimit);
@@ -37,10 +43,17 @@ export function registerDatabasesTools(server: McpServer): void {
         const pagination = buildPaginationMeta(page.length, limit, offset, allRows.length);
 
         const structured: Record<string, unknown> = { databases: page, pagination };
+
+        if (response_format === "markdown") {
+          const rows = page as Record<string, unknown>[];
+          let text = formatMarkdownTable(rows, "Databases");
+          text += `\n\n*Showing ${page.length} of ${allRows.length} databases*`;
+          return toolSuccess(text, structured);
+        }
         return toolSuccess(formatJson(structured), structured);
       } catch (err) {
         const msg = toActionableError(err);
-        console.error("list_databases failed:", msg);
+        console.error("mssql_list_databases failed:", msg);
         return toolError(`List databases failed: ${msg}`);
       }
     }

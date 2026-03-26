@@ -5,7 +5,7 @@ import { toActionableError, toolError, toolSuccess } from "../utils/errors.js";
 
 export function registerConnectTools(server: McpServer): void {
   server.registerTool(
-    "connect_database",
+    "mssql_connect_database",
     {
       title: "Connect Database",
       description:
@@ -26,14 +26,14 @@ export function registerConnectTools(server: McpServer): void {
         );
       } catch (err) {
         const msg = toActionableError(err);
-        console.error("connect_database failed:", msg);
+        console.error("mssql_connect_database failed:", msg);
         return toolError(`Connection failed: ${msg}`);
       }
     }
   );
 
   server.registerTool(
-    "disconnect_database",
+    "mssql_disconnect_database",
     {
       title: "Disconnect Database",
       description:

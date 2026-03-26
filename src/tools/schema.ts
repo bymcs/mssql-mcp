@@ -5,11 +5,12 @@ import { requirePool } from "../db/connection.js";
 import { buildSchemaObjectsQuery } from "../db/query-builders.js";
 import { toActionableError, toolError, toolSuccess } from "../utils/errors.js";
 import { formatJson } from "../utils/format.js";
+import { formatMarkdownTable } from "../utils/markdown.js";
 import { buildPaginationMeta, clampLimit } from "../utils/pagination.js";
 
 export function registerSchemaTools(server: McpServer): void {
   server.registerTool(
-    "list_schema_objects",
+    "mssql_list_schema_objects",
     {
       title: "List Schema Objects",
       description:
@@ -28,10 +29,15 @@ export function registerSchemaTools(server: McpServer): void {
           .describe("Filter to a specific schema (e.g. 'dbo')"),
         limit: z.number().int().min(1).max(200).optional().default(20).describe("Max objects (default 20)"),
         offset: z.number().int().min(0).optional().default(0).describe("Skip N objects"),
+        response_format: z
+          .enum(["json", "markdown"])
+          .optional()
+          .default("json")
+          .describe("Output format: 'json' for structured data, 'markdown' for human-readable table"),
       },
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
-    async ({ objectType, schemaName, limit: rawLimit, offset }) => {
+    async ({ objectType, schemaName, limit: rawLimit, offset, response_format }) => {
       try {
         const pool = requirePool();
         const limit = clampLimit(rawLimit);
@@ -48,10 +54,17 @@ export function registerSchemaTools(server: McpServer): void {
         const pagination = buildPaginationMeta(page.length, limit, offset, allRows.length);
 
         const structured: Record<string, unknown> = { objects: page, pagination };
+
+        if (response_format === "markdown") {
+          const rows = page as Record<string, unknown>[];
+          let text = formatMarkdownTable(rows, `Schema Objects (${objectType})`);
+          text += `\n\n*Showing ${page.length} of ${allRows.length} · offset ${offset}*`;
+          return toolSuccess(text, structured);
+        }
         return toolSuccess(formatJson(structured), structured);
       } catch (err) {
         const msg = toActionableError(err);
-        console.error("list_schema_objects failed:", msg);
+        console.error("mssql_list_schema_objects failed:", msg);
         return toolError(`Schema query failed: ${msg}`);
       }
     }
@@ -59,20 +72,21 @@ export function registerSchemaTools(server: McpServer): void {
 
   // Backward-compatible alias
   server.registerTool(
-    "get_schema",
+    "mssql_get_schema",
     {
-      title: "Get Schema (deprecated — use list_schema_objects)",
-      description: "Deprecated alias for list_schema_objects. Use list_schema_objects instead.",
+      title: "Get Schema (deprecated — use mssql_list_schema_objects)",
+      description: "Deprecated alias for mssql_list_schema_objects. Use mssql_list_schema_objects instead.",
       inputSchema: {
         objectType: z
           .enum(["tables", "views", "procedures", "functions", "all"])
           .optional()
           .default("tables"),
         schemaName: z.string().optional(),
+        response_format: z.enum(["json", "markdown"]).optional().default("json"),
       },
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
-    async ({ objectType, schemaName }) => {
+    async ({ objectType, schemaName, response_format }) => {
       try {
         const pool = requirePool();
         const query = buildSchemaObjectsQuery(objectType, schemaName);
@@ -81,7 +95,11 @@ export function registerSchemaTools(server: McpServer): void {
           request.input("schemaName", sql.VarChar, schemaName);
         }
         const result = await request.query(query);
-        return toolSuccess(formatJson(result.recordset ?? []));
+        const rows = result.recordset ?? [];
+        if (response_format === "markdown") {
+          return toolSuccess(formatMarkdownTable(rows as Record<string, unknown>[]));
+        }
+        return toolSuccess(formatJson(rows));
       } catch (err) {
         return toolError(`Schema query failed: ${toActionableError(err)}`);
       }

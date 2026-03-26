@@ -3,10 +3,11 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requirePool } from "../db/connection.js";
 import { toActionableError, toolError, toolSuccess } from "../utils/errors.js";
 import { formatJson, truncatePayload } from "../utils/format.js";
+import { formatMarkdownTable } from "../utils/markdown.js";
 
 export function registerQueryTools(server: McpServer): void {
   server.registerTool(
-    "run_sql_query",
+    "mssql_run_sql_query",
     {
       title: "Run SQL Query",
       description:
@@ -21,10 +22,15 @@ export function registerQueryTools(server: McpServer): void {
           .record(z.union([z.string(), z.number(), z.boolean(), z.null()]))
           .optional()
           .describe("Named parameters referenced in the query via @paramName"),
+        response_format: z
+          .enum(["json", "markdown"])
+          .optional()
+          .default("json")
+          .describe("Output format: 'json' for structured data, 'markdown' for human-readable table"),
       },
       annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: true },
     },
-    async ({ query, parameters }) => {
+    async ({ query, parameters, response_format }) => {
       try {
         const pool = requirePool();
         const request = pool.request();
@@ -47,10 +53,18 @@ export function registerQueryTools(server: McpServer): void {
           truncated,
         };
         if (truncation_message) structured.truncation_message = truncation_message;
+
+        if (response_format === "markdown") {
+          const rows = data as Record<string, unknown>[];
+          let text = formatMarkdownTable(rows);
+          if (truncated) text += `\n\n> ⚠️ ${truncation_message}`;
+          text += `\n\n*Rows affected: ${(result.rowsAffected ?? []).join(", ")} · ${elapsed}ms*`;
+          return toolSuccess(text, structured);
+        }
         return toolSuccess(formatJson(structured), structured);
       } catch (err) {
         const msg = toActionableError(err);
-        console.error("run_sql_query failed:", msg);
+        console.error("mssql_run_sql_query failed:", msg);
         return toolError(`Query failed: ${msg}`);
       }
     }
@@ -58,11 +72,11 @@ export function registerQueryTools(server: McpServer): void {
 
   // Backward-compatible alias
   server.registerTool(
-    "execute_query",
+    "mssql_execute_query",
     {
-      title: "Execute Query (deprecated — use run_sql_query)",
+      title: "Execute Query (deprecated — use mssql_run_sql_query)",
       description:
-        "Deprecated alias for run_sql_query. Use run_sql_query instead. " +
+        "Deprecated alias for mssql_run_sql_query. Use mssql_run_sql_query instead. " +
         "⚠️ This tool can read AND modify data.",
       inputSchema: {
         query: z.string().min(1).describe("SQL query to execute"),
@@ -70,10 +84,11 @@ export function registerQueryTools(server: McpServer): void {
           .record(z.union([z.string(), z.number(), z.boolean(), z.null()]))
           .optional()
           .describe("Query parameters"),
+        response_format: z.enum(["json", "markdown"]).optional().default("json"),
       },
       annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: true },
     },
-    async ({ query, parameters }) => {
+    async ({ query, parameters, response_format }) => {
       try {
         const pool = requirePool();
         const request = pool.request();
@@ -95,6 +110,10 @@ export function registerQueryTools(server: McpServer): void {
           truncated,
         };
         if (truncation_message) structured.truncation_message = truncation_message;
+        if (response_format === "markdown") {
+          const rows = data as Record<string, unknown>[];
+          return toolSuccess(formatMarkdownTable(rows), structured);
+        }
         return toolSuccess(formatJson(structured), structured);
       } catch (err) {
         return toolError(`Query failed: ${toActionableError(err)}`);
