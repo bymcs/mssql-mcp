@@ -41,6 +41,9 @@ pids/
 # Coverage directory
 coverage/
 
+# Local docs / planning files
+docs/
+
 # Optional npm cache directory
 .npm
 

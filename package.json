@@ -1,11 +1,11 @@
 {
   "name": "mssql-mcp",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "MCP Server for MS SQL Server integration with Claude Desktop, Cursor, Windsurf and VS Code",
-  "main": "dist/index.js",
+  "main": "dist/src/index.js",
   "type": "module",
   "bin": {
-    "mssql-mcp-server": "dist/index.js"
+    "mssql-mcp-server": "dist/src/index.js"
   },
   "files": [
     "dist/**/*",
@@ -26,10 +26,13 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "start": "node dist/index.js",
+    "start": "node dist/src/index.js",
+    "start:http": "cross-env MCP_TRANSPORT=http node dist/src/index.js",
     "clean": "rimraf dist",
     "prepublishOnly": "npm run clean && npm run build",
-    "test": "echo \"No tests specified\" && exit 0"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test dist/tests/unit/validators.test.js dist/tests/unit/query-builders.test.js dist/tests/unit/tool-contracts.test.js",
+    "ci": "npm run typecheck && npm run build && npm test"
   },
   "keywords": [
     "mcp",
@@ -53,6 +56,7 @@
   "devDependencies": {
     "@types/mssql": "^9.1.7",
     "@types/node": "^20.0.0",
+    "cross-env": "^7.0.3",
     "rimraf": "^5.0.0",
     "typescript": "^5.3.0"
   }
