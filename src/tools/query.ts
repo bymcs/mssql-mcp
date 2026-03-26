@@ -59,7 +59,7 @@ export function registerQueryTools(server: McpServer): void {
           let text = formatMarkdownTable(rows);
           if (truncated) text += `\n\n> ⚠️ ${truncation_message}`;
           text += `\n\n*Rows affected: ${(result.rowsAffected ?? []).join(", ")} · ${elapsed}ms*`;
-          return toolSuccess(text, structured);
+          return toolSuccess(text);
         }
         return toolSuccess(formatJson(structured), structured);
       } catch (err) {
@@ -112,7 +112,10 @@ export function registerQueryTools(server: McpServer): void {
         if (truncation_message) structured.truncation_message = truncation_message;
         if (response_format === "markdown") {
           const rows = data as Record<string, unknown>[];
-          return toolSuccess(formatMarkdownTable(rows), structured);
+          let text = formatMarkdownTable(rows);
+          if (truncated) text += `\n\n> ⚠️ ${truncation_message}`;
+          text += `\n\n*Rows affected: ${(result.rowsAffected ?? []).join(", ")} · ${elapsed}ms*`;
+          return toolSuccess(text);
         }
         return toolSuccess(formatJson(structured), structured);
       } catch (err) {

@@ -12,7 +12,9 @@ export function buildPaginationMeta(
   offset: number,
   totalCount?: number
 ): PaginationMeta {
-  const has_more = count === limit;
+  // has_more is an approximation when totalCount is unknown:
+  // if count === limit, there *may* be more rows (could be a false positive on the last page).
+  const has_more = totalCount != null ? offset + count < totalCount : count === limit;
   return {
     count,
     limit,

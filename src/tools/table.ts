@@ -55,8 +55,7 @@ export function registerTableTools(server: McpServer): void {
         if (response_format === "markdown") {
           const rows = result.recordset as Record<string, unknown>[];
           return toolSuccess(
-            formatMarkdownTable(rows, `Columns: ${schemaName}.${tableName}`),
-            structured
+            formatMarkdownTable(rows, `Columns: ${schemaName}.${tableName}`)
           );
         }
         return toolSuccess(formatJson(structured), structured);
@@ -204,7 +203,7 @@ export function registerTableTools(server: McpServer): void {
           let text = formatMarkdownTable(rows, `${schemaName}.${tableName}`);
           if (truncated) text += `\n\n> ⚠️ ${truncation_message}`;
           text += `\n\n*${rows.length} rows · offset ${offset} · ${elapsed}ms*`;
-          return toolSuccess(text, structured);
+          return toolSuccess(text);
         }
         return toolSuccess(formatJson(structured), structured);
       } catch (err) {
@@ -280,8 +279,7 @@ export function registerTableTools(server: McpServer): void {
         }
         if (response_format === "markdown") {
           return toolSuccess(
-            formatMarkdownTable(data as Record<string, unknown>[]),
-            structured
+            formatMarkdownTable(data as Record<string, unknown>[])
           );
         }
         return toolSuccess(formatJson(structured), structured);

@@ -59,7 +59,7 @@ export function registerSchemaTools(server: McpServer): void {
           const rows = page as Record<string, unknown>[];
           let text = formatMarkdownTable(rows, `Schema Objects (${objectType})`);
           text += `\n\n*Showing ${page.length} of ${allRows.length} · offset ${offset}*`;
-          return toolSuccess(text, structured);
+          return toolSuccess(text);
         }
         return toolSuccess(formatJson(structured), structured);
       } catch (err) {

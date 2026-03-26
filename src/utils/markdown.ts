@@ -1,3 +1,9 @@
+function escapeCell(value: unknown): string {
+  return String(value ?? "")
+    .replace(/\r?\n|\r/g, " ")
+    .replace(/\|/g, "\\|");
+}
+
 export function formatMarkdownTable(
   rows: Record<string, unknown>[],
   title?: string
@@ -9,7 +15,7 @@ export function formatMarkdownTable(
   const header = `| ${headers.join(" | ")} |`;
   const sep = `| ${headers.map(() => "---").join(" | ")} |`;
   const body = rows
-    .map((row) => `| ${headers.map((h) => String(row[h] ?? "")).join(" | ")} |`)
+    .map((row) => `| ${headers.map((h) => escapeCell(row[h])).join(" | ")} |`)
     .join("\n");
   const table = [header, sep, body].join("\n");
   return title ? `**${title}**\n\n${table}` : table;

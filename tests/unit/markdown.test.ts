@@ -41,6 +41,26 @@ test("formatMarkdownTable - null/undefined values render as empty string", () =>
   assert.ok(result.includes("| 1 |"));
 });
 
+test("formatMarkdownTable - pipe characters in cell values are escaped", () => {
+  const rows = [{ name: "foo | bar", status: "ok" }];
+  const result = formatMarkdownTable(rows);
+  assert.ok(result.includes("foo \\| bar"), "pipe not escaped");
+  assert.ok(!result.includes("foo | bar"), "raw pipe should not appear in data row");
+});
+
+test("formatMarkdownTable - newlines in cell values are replaced with space", () => {
+  const rows = [{ notes: "line1\nline2", other: "x" }];
+  const result = formatMarkdownTable(rows);
+  assert.ok(result.includes("line1 line2"), "newline not replaced");
+  assert.ok(!result.includes("line1\nline2"), "raw newline should not appear");
+});
+
+test("formatMarkdownTable - CRLF in cell values are replaced with space", () => {
+  const rows = [{ notes: "line1\r\nline2" }];
+  const result = formatMarkdownTable(rows);
+  assert.ok(result.includes("line1 line2"));
+});
+
 test("formatMarkdownList - renders key-value pairs", () => {
   const result = formatMarkdownList({ status: "connected", server: "localhost" });
   assert.ok(result.includes("**status**: connected"));

@@ -55,8 +55,7 @@ export function registerProcedureTools(server: McpServer): void {
 
         if (response_format === "markdown") {
           return toolSuccess(
-            formatMarkdownMultiRecordsets(result.recordsets as unknown[][], qualifiedName),
-            structured
+            formatMarkdownMultiRecordsets(result.recordsets as unknown[][], qualifiedName)
           );
         }
         return toolSuccess(formatJson(structured), structured);
@@ -105,8 +104,7 @@ export function registerProcedureTools(server: McpServer): void {
         };
         if (response_format === "markdown") {
           return toolSuccess(
-            formatMarkdownMultiRecordsets(result.recordsets as unknown[][]),
-            structured
+            formatMarkdownMultiRecordsets(result.recordsets as unknown[][])
           );
         }
         return toolSuccess(formatJson(structured), structured);
