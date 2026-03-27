@@ -6,6 +6,13 @@ import { toActionableError, toolError, toolSuccess } from "../utils/errors.js";
 import { formatJson } from "../utils/format.js";
 import { formatMarkdownMultiRecordsets } from "../utils/markdown.js";
 
+const ProcedureOutputSchema = {
+  recordsets: z.array(z.array(z.record(z.unknown()))),
+  rows_affected: z.array(z.number()),
+  output: z.record(z.unknown()),
+  return_value: z.unknown(),
+};
+
 export function registerProcedureTools(server: McpServer): void {
   server.registerTool(
     "mssql_execute_stored_procedure",
@@ -30,6 +37,7 @@ export function registerProcedureTools(server: McpServer): void {
           .describe("Output format: 'json' for structured data, 'markdown' for human-readable tables"),
       },
       annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: true },
+      outputSchema: ProcedureOutputSchema,
     },
     async ({ procedureName, schemaName, parameters, response_format }) => {
       try {
@@ -55,7 +63,8 @@ export function registerProcedureTools(server: McpServer): void {
 
         if (response_format === "markdown") {
           return toolSuccess(
-            formatMarkdownMultiRecordsets(result.recordsets as unknown[][], qualifiedName)
+            formatMarkdownMultiRecordsets(result.recordsets as unknown[][], qualifiedName),
+            structured
           );
         }
         return toolSuccess(formatJson(structured), structured);

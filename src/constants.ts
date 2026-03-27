@@ -1,5 +1,5 @@
 export const SERVER_NAME = "mssql-mcp-server";
-export const SERVER_VERSION = "2.2.0";
+export const SERVER_VERSION = "2.3.0";
 
 export const DEFAULT_PORT = 1433;
 export const DEFAULT_ENCRYPT = true;

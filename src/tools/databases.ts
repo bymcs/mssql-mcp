@@ -5,6 +5,7 @@ import { toActionableError, toolError, toolSuccess } from "../utils/errors.js";
 import { formatJson } from "../utils/format.js";
 import { formatMarkdownTable } from "../utils/markdown.js";
 import { buildPaginationMeta, clampLimit } from "../utils/pagination.js";
+import { PaginationSchema, DatabaseInfoSchema } from "../schemas/outputs.js";
 
 export function registerDatabasesTools(server: McpServer): void {
   server.registerTool(
@@ -24,6 +25,7 @@ export function registerDatabasesTools(server: McpServer): void {
           .describe("Output format: 'json' for structured data, 'markdown' for human-readable table"),
       },
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+      outputSchema: { databases: z.array(DatabaseInfoSchema), pagination: PaginationSchema },
     },
     async ({ limit: rawLimit, offset, response_format }) => {
       try {
@@ -48,7 +50,7 @@ export function registerDatabasesTools(server: McpServer): void {
           const rows = page as Record<string, unknown>[];
           let text = formatMarkdownTable(rows, "Databases");
           text += `\n\n*Showing ${page.length} of ${allRows.length} databases*`;
-          return toolSuccess(text);
+          return toolSuccess(text, structured);
         }
         return toolSuccess(formatJson(structured), structured);
       } catch (err) {

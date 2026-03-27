@@ -41,6 +41,15 @@ export async function runHttpTransport(server: McpServer, config: HttpConfig): P
 
   process.on("SIGINT", () => shutdown("SIGINT"));
   process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGUSR2", () => shutdown("SIGUSR2"));
+  process.on("uncaughtException", (err) => {
+    console.error("Uncaught exception:", err);
+    shutdown("uncaughtException");
+  });
+  process.on("unhandledRejection", (reason) => {
+    console.error("Unhandled rejection:", reason);
+    shutdown("unhandledRejection");
+  });
 
   await server.connect(transport);
 

@@ -1,7 +1,9 @@
+import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { loadConfigFromEnv } from "../config.js";
 import { connectPool, disconnectPool, getConnectionState } from "../db/connection.js";
 import { toActionableError, toolError, toolSuccess } from "../utils/errors.js";
+import { ConnectionStateSchema } from "../schemas/outputs.js";
 
 export function registerConnectTools(server: McpServer): void {
   server.registerTool(
@@ -13,6 +15,7 @@ export function registerConnectTools(server: McpServer): void {
         "DB_PORT, DB_ENCRYPT, DB_TRUST_SERVER_CERTIFICATE). No credentials accepted as parameters — all " +
         "connection settings come from the server environment only. Idempotent: calling again reconnects.",
       inputSchema: {},
+      outputSchema: ConnectionStateSchema,
       annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {
@@ -40,15 +43,18 @@ export function registerConnectTools(server: McpServer): void {
         "Closes the current database connection and releases the connection pool. " +
         "Safe to call even if not connected. Idempotent.",
       inputSchema: {},
+      outputSchema: { message: z.string() },
       annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {
       try {
         await disconnectPool();
-        return toolSuccess("✅ Disconnected from database.");
+        const msg = "✅ Disconnected from database.";
+        return toolSuccess(msg, { message: msg });
       } catch (err) {
         return toolError(`Disconnect failed: ${toActionableError(err)}`);
       }
     }
   );
 }
+

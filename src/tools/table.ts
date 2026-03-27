@@ -2,12 +2,13 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import sql from "mssql";
 import { requirePool } from "../db/connection.js";
-import { validateIdentifier, bracketIdentifier, validateOrderBy } from "../db/validators.js";
+import { validateIdentifier, bracketIdentifier, validateOrderBy, SAFE_IDENTIFIER_RE } from "../db/validators.js";
 import { buildSelectQuery, buildSelectWithWhereQuery } from "../db/query-builders.js";
 import { toActionableError, toolError, toolSuccess } from "../utils/errors.js";
 import { formatJson, truncatePayload } from "../utils/format.js";
 import { formatMarkdownTable } from "../utils/markdown.js";
 import { buildPaginationMeta, clampLimit } from "../utils/pagination.js";
+import { PaginationSchema, ColumnInfoSchema } from "../schemas/outputs.js";
 
 export function registerTableTools(server: McpServer): void {
   server.registerTool(
@@ -27,6 +28,7 @@ export function registerTableTools(server: McpServer): void {
           .describe("Output format: 'json' for structured data, 'markdown' for human-readable table"),
       },
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+      outputSchema: { columns: z.array(ColumnInfoSchema), table: z.string() },
     },
     async ({ tableName, schemaName, response_format }) => {
       try {
@@ -55,7 +57,8 @@ export function registerTableTools(server: McpServer): void {
         if (response_format === "markdown") {
           const rows = result.recordset as Record<string, unknown>[];
           return toolSuccess(
-            formatMarkdownTable(rows, `Columns: ${schemaName}.${tableName}`)
+            formatMarkdownTable(rows, `Columns: ${schemaName}.${tableName}`),
+            structured
           );
         }
         return toolSuccess(formatJson(structured), structured);
@@ -108,7 +111,7 @@ export function registerTableTools(server: McpServer): void {
     }
   );
 
-  const safeIdentifierPattern = /^[a-zA-Z_][a-zA-Z0-9_$#@]{0,127}$/;
+  const safeIdentifierPattern = SAFE_IDENTIFIER_RE;
 
   server.registerTool(
     "mssql_read_table_rows",
@@ -160,6 +163,14 @@ export function registerTableTools(server: McpServer): void {
           .describe("Output format: 'json' for structured data, 'markdown' for human-readable table"),
       },
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+      outputSchema: {
+        data: z.array(z.record(z.unknown())),
+        pagination: PaginationSchema,
+        table: z.string(),
+        execution_time_ms: z.number(),
+        truncated: z.boolean().optional(),
+        truncation_message: z.string().optional(),
+      },
     },
     async ({ tableName, schemaName, columns, limit: rawLimit, offset, whereClause, orderBy, parameters, response_format }) => {
       try {
@@ -203,7 +214,7 @@ export function registerTableTools(server: McpServer): void {
           let text = formatMarkdownTable(rows, `${schemaName}.${tableName}`);
           if (truncated) text += `\n\n> ⚠️ ${truncation_message}`;
           text += `\n\n*${rows.length} rows · offset ${offset} · ${elapsed}ms*`;
-          return toolSuccess(text);
+          return toolSuccess(text, structured);
         }
         return toolSuccess(formatJson(structured), structured);
       } catch (err) {
@@ -226,10 +237,10 @@ export function registerTableTools(server: McpServer): void {
         tableName: z
           .string()
           .min(1)
-          .regex(/^[a-zA-Z0-9_]+$/, "Only letters, numbers, underscores"),
+          .regex(SAFE_IDENTIFIER_RE, "Must be a valid SQL identifier"),
         schemaName: z
           .string()
-          .regex(/^[a-zA-Z0-9_]+$/)
+          .regex(SAFE_IDENTIFIER_RE, "Must be a valid SQL identifier")
           .optional()
           .default("dbo"),
         limit: z.number().int().min(1).max(200).optional().default(20),

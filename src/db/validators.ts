@@ -2,7 +2,7 @@
 // Only validates identifier names (schema, table, procedure) — never user values.
 // User values must always be passed as mssql parameters, never interpolated.
 
-const SAFE_IDENTIFIER_RE = /^[a-zA-Z_][a-zA-Z0-9_$#@]{0,127}$/;
+export const SAFE_IDENTIFIER_RE = /^[a-zA-Z_][a-zA-Z0-9_$#@]{0,127}$/;
 
 export function isValidIdentifier(name: string): boolean {
   return SAFE_IDENTIFIER_RE.test(name);
