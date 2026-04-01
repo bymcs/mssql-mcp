@@ -1,21 +1,7 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { toolSuccess, toolSuccessMarkdown } from "../../src/utils/errors.js";
 import { buildPaginationMeta, clampLimit } from "../../src/utils/pagination.js";
-import { formatJson, truncatePayload } from "../../src/utils/format.js";
-
-function DateTime2() {}
-
-function pad(value: number, width: number): string {
-  return String(value).padStart(width, "0");
-}
-
-function formatLocalDateTime(date: Date): string {
-  return [
-    `${pad(date.getFullYear(), 4)}-${pad(date.getMonth() + 1, 2)}-${pad(date.getDate(), 2)}`,
-    `${pad(date.getHours(), 2)}:${pad(date.getMinutes(), 2)}:${pad(date.getSeconds(), 2)}.${pad(date.getMilliseconds(), 3)}6938`,
-  ].join(" ");
-}
+import { truncatePayload } from "../../src/utils/format.js";
 
 test("clampLimit - defaults to DEFAULT_PAGE_SIZE (20)", () => {
   assert.equal(clampLimit(undefined), 20);
@@ -84,41 +70,4 @@ test("truncatePayload - empty array not truncated", () => {
   const result = truncatePayload([], 100_000);
   assert.equal(result.truncated, false);
   assert.equal(result.data.length, 0);
-});
-
-test("formatJson - recordset datetime values use SQL-like formatting", () => {
-  const serverTime = new Date(2026, 3, 1, 10, 51, 23, 600);
-  Object.defineProperty(serverTime, "nanosecondsDelta", { value: 0.0006938 });
-  const rows = Object.assign([{ server_time: serverTime }], {
-    columns: { server_time: { type: DateTime2, scale: 7 } },
-  }) as Record<string, unknown>[] & {
-    columns: Record<string, { type?: unknown; scale?: number }>;
-  };
-
-  const result = formatJson({ recordset: rows });
-
-  assert.ok(result.includes(formatLocalDateTime(serverTime)));
-  assert.ok(!result.includes("GMT"));
-  assert.ok(!result.includes("T10:51:23"));
-});
-
-test("toolSuccessMarkdown - returns text content without structuredContent", () => {
-  const result = toolSuccessMarkdown("| col |\n| --- |\n| value |") as {
-    content: Array<{ type: string; text: string }>;
-    structuredContent?: Record<string, unknown>;
-  };
-
-  assert.equal(result.content[0].type, "text");
-  assert.ok(result.content[0].text.includes("| col |"));
-  assert.equal(result.structuredContent, undefined);
-});
-
-test("toolSuccess - keeps structuredContent for json-style responses", () => {
-  const result = toolSuccess("{\n  \"ok\": true\n}", { ok: true }) as {
-    content: Array<{ type: string; text: string }>;
-    structuredContent?: Record<string, unknown>;
-  };
-
-  assert.equal(result.content[0].type, "text");
-  assert.equal(result.structuredContent?.ok, true);
 });

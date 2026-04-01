@@ -1,11 +1,21 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requirePool } from "../db/connection.js";
-import { toActionableError, toolError, toolSuccess, toolSuccessMarkdown } from "../utils/errors.js";
+import { toActionableError, toolError, toolSuccess } from "../utils/errors.js";
 import { formatJson, truncatePayload } from "../utils/format.js";
 import { formatMarkdownTable } from "../utils/markdown.js";
 
 type QueryParams = Record<string, string | number | boolean | null>;
+
+const QueryOutputSchema = {
+  recordset: z.array(z.record(z.unknown())),
+  rows_affected: z.array(z.number()),
+  output: z.record(z.unknown()),
+  execution_time_ms: z.number(),
+  parameters_used: z.number(),
+  truncated: z.boolean(),
+  truncation_message: z.string().optional(),
+};
 
 async function runSqlQueryCore(
   query: string,
@@ -41,7 +51,7 @@ async function runSqlQueryCore(
       let text = formatMarkdownTable(rows);
       if (truncated) text += `\n\n> ⚠️ ${truncation_message}`;
       text += `\n\n*Rows affected: ${(result.rowsAffected ?? []).join(", ")} · ${elapsed}ms*`;
-      return toolSuccessMarkdown(text);
+      return toolSuccess(text, structured);
     }
     return toolSuccess(formatJson(structured), structured);
   } catch (err) {
@@ -75,6 +85,7 @@ export function registerQueryTools(server: McpServer): void {
           .describe("Output format: 'json' for structured data, 'markdown' for human-readable table"),
       },
       annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: true },
+      outputSchema: QueryOutputSchema,
     },
     ({ query, parameters, response_format }) =>
       runSqlQueryCore(query, parameters, response_format, "mssql_run_sql_query")

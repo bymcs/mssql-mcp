@@ -24,7 +24,6 @@ export async function connectPool(config: DatabaseConfig): Promise<void> {
       encrypt: config.encrypt,
       trustServerCertificate: config.trustServerCertificate,
       enableArithAbort: true,
-      useUTC: false,
     },
     connectionTimeout: config.connectionTimeout,
     requestTimeout: config.requestTimeout,

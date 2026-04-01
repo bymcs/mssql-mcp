@@ -4,10 +4,11 @@ import sql from "mssql";
 import { requirePool } from "../db/connection.js";
 import { validateIdentifier, bracketIdentifier, validateOrderBy, SAFE_IDENTIFIER_RE } from "../db/validators.js";
 import { buildSelectQuery, buildSelectWithWhereQuery } from "../db/query-builders.js";
-import { toActionableError, toolError, toolSuccess, toolSuccessMarkdown } from "../utils/errors.js";
+import { toActionableError, toolError, toolSuccess } from "../utils/errors.js";
 import { formatJson, truncatePayload } from "../utils/format.js";
 import { formatMarkdownTable } from "../utils/markdown.js";
 import { buildPaginationMeta, clampLimit } from "../utils/pagination.js";
+import { PaginationSchema, ColumnInfoSchema } from "../schemas/outputs.js";
 
 export function registerTableTools(server: McpServer): void {
   server.registerTool(
@@ -27,6 +28,7 @@ export function registerTableTools(server: McpServer): void {
           .describe("Output format: 'json' for structured data, 'markdown' for human-readable table"),
       },
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+      outputSchema: { columns: z.array(ColumnInfoSchema), table: z.string() },
     },
     async ({ tableName, schemaName, response_format }) => {
       try {
@@ -54,8 +56,9 @@ export function registerTableTools(server: McpServer): void {
 
         if (response_format === "markdown") {
           const rows = result.recordset as Record<string, unknown>[];
-          return toolSuccessMarkdown(
-            formatMarkdownTable(rows, `Columns: ${schemaName}.${tableName}`)
+          return toolSuccess(
+            formatMarkdownTable(rows, `Columns: ${schemaName}.${tableName}`),
+            structured
           );
         }
         return toolSuccess(formatJson(structured), structured);
@@ -99,7 +102,7 @@ export function registerTableTools(server: McpServer): void {
           `);
         const rows = result.recordset ?? [];
         if (response_format === "markdown") {
-          return toolSuccessMarkdown(formatMarkdownTable(rows as Record<string, unknown>[]));
+          return toolSuccess(formatMarkdownTable(rows as Record<string, unknown>[]));
         }
         return toolSuccess(formatJson(rows));
       } catch (err) {
@@ -160,6 +163,14 @@ export function registerTableTools(server: McpServer): void {
           .describe("Output format: 'json' for structured data, 'markdown' for human-readable table"),
       },
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+      outputSchema: {
+        data: z.array(z.record(z.unknown())),
+        pagination: PaginationSchema,
+        table: z.string(),
+        execution_time_ms: z.number(),
+        truncated: z.boolean().optional(),
+        truncation_message: z.string().optional(),
+      },
     },
     async ({ tableName, schemaName, columns, limit: rawLimit, offset, whereClause, orderBy, parameters, response_format }) => {
       try {
@@ -203,7 +214,7 @@ export function registerTableTools(server: McpServer): void {
           let text = formatMarkdownTable(rows, `${schemaName}.${tableName}`);
           if (truncated) text += `\n\n> ⚠️ ${truncation_message}`;
           text += `\n\n*${rows.length} rows · offset ${offset} · ${elapsed}ms*`;
-          return toolSuccessMarkdown(text);
+          return toolSuccess(text, structured);
         }
         return toolSuccess(formatJson(structured), structured);
       } catch (err) {
@@ -278,7 +289,7 @@ export function registerTableTools(server: McpServer): void {
           structured.truncation_message = truncation_message;
         }
         if (response_format === "markdown") {
-          return toolSuccessMarkdown(
+          return toolSuccess(
             formatMarkdownTable(data as Record<string, unknown>[])
           );
         }

@@ -1,5 +1,3 @@
-import { normalizeOutput } from "./format.js";
-
 export class McpToolError extends Error {
   constructor(message: string, public readonly cause?: unknown) {
     super(message);
@@ -21,12 +19,6 @@ export function toolError(message: string) {
   };
 }
 
-export function toolSuccessMarkdown(text: string) {
-  return {
-    content: [{ type: "text" as const, text }],
-  };
-}
-
 export function toolSuccess(text: string, structuredContent?: Record<string, unknown>) {
   const result: {
     content: Array<{ type: "text"; text: string }>;
@@ -35,7 +27,7 @@ export function toolSuccess(text: string, structuredContent?: Record<string, unk
     content: [{ type: "text" as const, text }],
   };
   if (structuredContent !== undefined) {
-    result.structuredContent = normalizeOutput(structuredContent) as Record<string, unknown>;
+    result.structuredContent = structuredContent;
   }
   return result;
 }

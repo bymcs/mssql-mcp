@@ -2,9 +2,16 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requirePool } from "../db/connection.js";
 import { validateIdentifier, bracketIdentifier } from "../db/validators.js";
-import { toActionableError, toolError, toolSuccess, toolSuccessMarkdown } from "../utils/errors.js";
+import { toActionableError, toolError, toolSuccess } from "../utils/errors.js";
 import { formatJson } from "../utils/format.js";
 import { formatMarkdownMultiRecordsets } from "../utils/markdown.js";
+
+const ProcedureOutputSchema = {
+  recordsets: z.array(z.array(z.record(z.unknown()))),
+  rows_affected: z.array(z.number()),
+  output: z.record(z.unknown()),
+  return_value: z.unknown(),
+};
 
 export function registerProcedureTools(server: McpServer): void {
   server.registerTool(
@@ -30,6 +37,7 @@ export function registerProcedureTools(server: McpServer): void {
           .describe("Output format: 'json' for structured data, 'markdown' for human-readable tables"),
       },
       annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: true },
+      outputSchema: ProcedureOutputSchema,
     },
     async ({ procedureName, schemaName, parameters, response_format }) => {
       try {
@@ -54,8 +62,9 @@ export function registerProcedureTools(server: McpServer): void {
         };
 
         if (response_format === "markdown") {
-          return toolSuccessMarkdown(
+          return toolSuccess(
             formatMarkdownMultiRecordsets(result.recordsets as unknown[][], qualifiedName),
+            structured
           );
         }
         return toolSuccess(formatJson(structured), structured);
@@ -103,7 +112,7 @@ export function registerProcedureTools(server: McpServer): void {
           returnValue: result.returnValue,
         };
         if (response_format === "markdown") {
-          return toolSuccessMarkdown(
+          return toolSuccess(
             formatMarkdownMultiRecordsets(result.recordsets as unknown[][])
           );
         }

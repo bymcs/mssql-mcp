@@ -3,10 +3,11 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import sql from "mssql";
 import { requirePool } from "../db/connection.js";
 import { buildSchemaObjectsQuery } from "../db/query-builders.js";
-import { toActionableError, toolError, toolSuccess, toolSuccessMarkdown } from "../utils/errors.js";
+import { toActionableError, toolError, toolSuccess } from "../utils/errors.js";
 import { formatJson } from "../utils/format.js";
 import { formatMarkdownTable } from "../utils/markdown.js";
 import { buildPaginationMeta, clampLimit } from "../utils/pagination.js";
+import { PaginationSchema, SchemaObjectSchema } from "../schemas/outputs.js";
 
 export function registerSchemaTools(server: McpServer): void {
   server.registerTool(
@@ -36,6 +37,7 @@ export function registerSchemaTools(server: McpServer): void {
           .describe("Output format: 'json' for structured data, 'markdown' for human-readable table"),
       },
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+      outputSchema: { objects: z.array(SchemaObjectSchema), pagination: PaginationSchema },
     },
     async ({ objectType, schemaName, limit: rawLimit, offset, response_format }) => {
       try {
@@ -59,7 +61,7 @@ export function registerSchemaTools(server: McpServer): void {
           const rows = page as Record<string, unknown>[];
           let text = formatMarkdownTable(rows, `Schema Objects (${objectType})`);
           text += `\n\n*Showing ${page.length} of ${allRows.length} · offset ${offset}*`;
-          return toolSuccessMarkdown(text);
+          return toolSuccess(text, structured);
         }
         return toolSuccess(formatJson(structured), structured);
       } catch (err) {
@@ -97,7 +99,7 @@ export function registerSchemaTools(server: McpServer): void {
         const result = await request.query(query);
         const rows = result.recordset ?? [];
         if (response_format === "markdown") {
-          return toolSuccessMarkdown(formatMarkdownTable(rows as Record<string, unknown>[]));
+          return toolSuccess(formatMarkdownTable(rows as Record<string, unknown>[]));
         }
         return toolSuccess(formatJson(rows));
       } catch (err) {
