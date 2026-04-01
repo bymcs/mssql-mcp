@@ -1,6 +1,6 @@
 {
   "name": "mssql-mcp",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "MCP Server for MS SQL Server integration with Claude Desktop, Cursor, Windsurf and VS Code",
   "main": "dist/src/index.js",
   "type": "module",

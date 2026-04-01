@@ -6,6 +6,19 @@ import {
   formatMarkdownMultiRecordsets,
 } from "../../src/utils/markdown.js";
 
+function DateTimeOffset() {}
+
+function pad(value: number, width: number): string {
+  return String(value).padStart(width, "0");
+}
+
+function formatUtcDateTime(date: Date): string {
+  return [
+    `${pad(date.getUTCFullYear(), 4)}-${pad(date.getUTCMonth() + 1, 2)}-${pad(date.getUTCDate(), 2)}`,
+    `${pad(date.getUTCHours(), 2)}:${pad(date.getUTCMinutes(), 2)}:${pad(date.getUTCSeconds(), 2)}.${pad(date.getUTCMilliseconds(), 3)}6938`,
+  ].join(" ");
+}
+
 test("formatMarkdownTable - renders header and rows", () => {
   const rows = [
     { name: "Users", schema: "dbo" },
@@ -59,6 +72,21 @@ test("formatMarkdownTable - CRLF in cell values are replaced with space", () => 
   const rows = [{ notes: "line1\r\nline2" }];
   const result = formatMarkdownTable(rows);
   assert.ok(result.includes("line1 line2"));
+});
+
+test("formatMarkdownTable - datetimeoffset values render without JS timezone string", () => {
+  const offsetTime = new Date(Date.UTC(2026, 3, 1, 10, 51, 23, 600));
+  Object.defineProperty(offsetTime, "nanosecondsDelta", { value: 0.0006938 });
+  const rows = Object.assign([{ offset_time: offsetTime }], {
+    columns: { offset_time: { type: DateTimeOffset, scale: 7 } },
+  }) as Record<string, unknown>[] & {
+    columns: Record<string, { type?: unknown; scale?: number }>;
+  };
+
+  const result = formatMarkdownTable(rows);
+
+  assert.ok(result.includes(formatUtcDateTime(offsetTime)));
+  assert.ok(!result.includes("GMT"));
 });
 
 test("formatMarkdownList - renders key-value pairs", () => {
