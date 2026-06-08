@@ -62,3 +62,18 @@ test("validateOrderBy - invalid clauses", () => {
   assert.throws(() => validateOrderBy("Name UNION SELECT"), /Invalid ORDER BY/);
   assert.throws(() => validateOrderBy("Name--comment"), /Invalid ORDER BY/);
 });
+
+test("isValidIdentifier - 128-char identifier is valid (at limit)", () => {
+  const name = "a" + "x".repeat(127); // 1 + 127 = 128 chars
+  assert.ok(isValidIdentifier(name));
+});
+
+test("isValidIdentifier - 129-char identifier is invalid (over limit)", () => {
+  const name = "a" + "x".repeat(128); // 1 + 128 = 129 chars
+  assert.ok(!isValidIdentifier(name));
+});
+
+test("isValidIdentifier - single char identifier is valid", () => {
+  assert.ok(isValidIdentifier("a"));
+  assert.ok(isValidIdentifier("_"));
+});

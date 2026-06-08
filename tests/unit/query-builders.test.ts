@@ -78,3 +78,31 @@ test("buildSchemaObjectsQuery - without schema filter has no @schemaName", () =>
   const q = buildSchemaObjectsQuery("tables");
   assert.ok(!q.includes("@schemaName"));
 });
+
+test("buildSchemaObjectsQuery - procedures only", () => {
+  const q = buildSchemaObjectsQuery("procedures");
+  assert.ok(q.includes("ROUTINE_TYPE = 'PROCEDURE'"));
+  assert.ok(!q.includes("INFORMATION_SCHEMA.TABLES"));
+  assert.ok(!q.includes("INFORMATION_SCHEMA.VIEWS"));
+  assert.ok(!q.includes("ROUTINE_TYPE = 'FUNCTION'"));
+});
+
+test("buildSchemaObjectsQuery - functions only", () => {
+  const q = buildSchemaObjectsQuery("functions");
+  assert.ok(q.includes("ROUTINE_TYPE = 'FUNCTION'"));
+  assert.ok(!q.includes("INFORMATION_SCHEMA.TABLES"));
+  assert.ok(!q.includes("ROUTINE_TYPE = 'PROCEDURE'"));
+});
+
+test("buildSelectWithWhereQuery - with column projection", () => {
+  const q = buildSelectWithWhereQuery("dbo", "Orders", ["Id", "Status"], "Status = @status", null, 0, 10);
+  assert.ok(q.includes("[Id], [Status]"));
+  assert.ok(q.includes("WHERE Status = @status"));
+  assert.ok(!q.includes("SELECT *"));
+});
+
+test("buildSelectWithWhereQuery - with orderBy", () => {
+  const q = buildSelectWithWhereQuery("dbo", "Orders", null, "Total > @min", "Total DESC", 0, 20);
+  assert.ok(q.includes("ORDER BY Total DESC"));
+  assert.ok(q.includes("WHERE Total > @min"));
+});
