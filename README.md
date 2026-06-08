@@ -1,4 +1,4 @@
-# MS SQL Server MCP Server v2.3.2
+# MS SQL Server MCP Server v2.3.3
 
 🚀 **Model Context Protocol (MCP) server** for Microsoft SQL Server - compatible with Claude Desktop, Cursor, Windsurf and VS Code.
 
