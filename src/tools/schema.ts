@@ -8,6 +8,22 @@ import { formatJson } from "../utils/format.js";
 import { formatMarkdownTable } from "../utils/markdown.js";
 import { buildPaginationMeta, clampLimit } from "../utils/pagination.js";
 
+type SchemaObjectType = "tables" | "views" | "procedures" | "functions" | "all";
+
+async function fetchSchemaObjects(
+  pool: sql.ConnectionPool,
+  objectType: SchemaObjectType,
+  schemaName: string | undefined
+): Promise<unknown[]> {
+  const query = buildSchemaObjectsQuery(objectType, schemaName);
+  const request = pool.request();
+  if (schemaName) {
+    request.input("schemaName", sql.VarChar, schemaName);
+  }
+  const result = await request.query(query);
+  return result.recordset ?? [];
+}
+
 export function registerSchemaTools(server: McpServer): void {
   server.registerTool(
     "mssql_list_schema_objects",
@@ -41,15 +57,7 @@ export function registerSchemaTools(server: McpServer): void {
       try {
         const pool = requirePool();
         const limit = clampLimit(rawLimit);
-        const query = buildSchemaObjectsQuery(objectType, schemaName);
-
-        const request = pool.request();
-        if (schemaName) {
-          request.input("schemaName", sql.VarChar, schemaName);
-        }
-        const result = await request.query(query);
-
-        const allRows: unknown[] = result.recordset ?? [];
+        const allRows = await fetchSchemaObjects(pool, objectType, schemaName);
         const page = allRows.slice(offset, offset + limit);
         const pagination = buildPaginationMeta(page.length, limit, offset, allRows.length);
 
@@ -89,13 +97,7 @@ export function registerSchemaTools(server: McpServer): void {
     async ({ objectType, schemaName, response_format }) => {
       try {
         const pool = requirePool();
-        const query = buildSchemaObjectsQuery(objectType, schemaName);
-        const request = pool.request();
-        if (schemaName) {
-          request.input("schemaName", sql.VarChar, schemaName);
-        }
-        const result = await request.query(query);
-        const rows = result.recordset ?? [];
+        const rows = await fetchSchemaObjects(pool, objectType, schemaName);
         if (response_format === "markdown") {
           return toolSuccessMarkdown(formatMarkdownTable(rows as Record<string, unknown>[]));
         }

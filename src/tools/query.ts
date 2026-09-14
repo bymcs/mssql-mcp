@@ -65,7 +65,7 @@ export function registerQueryTools(server: McpServer): void {
       inputSchema: {
         query: z.string().min(1).describe("SQL statement to execute"),
         parameters: z
-          .record(z.union([z.string(), z.number(), z.boolean(), z.null()]))
+          .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
           .optional()
           .describe("Named parameters referenced in the query via @paramName"),
         response_format: z
@@ -91,7 +91,7 @@ export function registerQueryTools(server: McpServer): void {
       inputSchema: {
         query: z.string().min(1).describe("SQL query to execute"),
         parameters: z
-          .record(z.union([z.string(), z.number(), z.boolean(), z.null()]))
+          .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
           .optional()
           .describe("Query parameters"),
         response_format: z.enum(["json", "markdown"]).optional().default("json"),
