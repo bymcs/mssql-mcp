@@ -27,6 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Fixed a potential CPU-pegging hang on results containing deeply nested or
+  circular object graphs: `normalizeOutput()` in `src/utils/format.ts` now
+  bounds its recursion depth (50 levels) and detects circular references
+  instead of recursing without limit, which could previously overflow the
+  call stack and make reporting the resulting error itself extremely slow.
+  The `uncaughtException`/`unhandledRejection` handlers in both transports
+  also now log a bounded message/stack via `formatFatalError()` instead of
+  the raw `Error` object. Reported in
+  [#5](https://github.com/BYMCS/mssql-mcp/issues/5).
 - Deduplicated the deprecated alias tools (`mssql_get_schema`,
   `mssql_describe_table`, `mssql_get_table_data`, `mssql_execute_procedure`) so
   they share the same query-building/execution logic as their primary tools

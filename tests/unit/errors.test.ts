@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { McpToolError, toActionableError, toolError } from "../../src/utils/errors.js";
+import { McpToolError, toActionableError, toolError, formatFatalError } from "../../src/utils/errors.js";
 
 test("toolError - wraps message with error emoji", () => {
   const result = toolError("connection failed");
@@ -61,4 +61,30 @@ test("McpToolError - stores cause when provided", () => {
 test("McpToolError - cause is undefined when not provided", () => {
   const err = new McpToolError("no cause");
   assert.equal(err.cause, undefined);
+});
+
+// --- formatFatalError (issue #5) ---
+
+test("formatFatalError - includes the error message for a normal Error", () => {
+  const result = formatFatalError(new Error("boom"));
+  assert.ok(result.includes("boom"));
+});
+
+test("formatFatalError - bounds the number of stack lines", () => {
+  const err = new Error("deep");
+  err.stack = Array.from({ length: 5000 }, (_, i) => `    at frame${i} (file.js:1:1)`).join("\n");
+  const result = formatFatalError(err);
+  const lineCount = result.split("\n").length;
+  assert.ok(lineCount <= 20, `Expected at most 20 lines, got ${lineCount}`);
+});
+
+test("formatFatalError - falls back to the message when stack is unavailable", () => {
+  const err = new Error("no stack");
+  err.stack = undefined;
+  assert.equal(formatFatalError(err), "no stack");
+});
+
+test("formatFatalError - stringifies non-Error values", () => {
+  assert.equal(formatFatalError("plain reason"), "plain reason");
+  assert.equal(formatFatalError(42), "42");
 });

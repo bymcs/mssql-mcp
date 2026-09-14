@@ -132,3 +132,52 @@ test("normalizeOutput - normalizes Date values inside array", () => {
   const result = normalizeOutput([d]) as unknown[];
   assert.equal(result[0], `${formatLocalDateTime(d)}`);
 });
+
+// --- normalizeOutput: depth limit & circular reference guard (issue #5) ---
+
+test("normalizeOutput - bounds recursion depth instead of overflowing the stack", () => {
+  let root: Record<string, unknown> = { value: "leaf" };
+  for (let i = 0; i < 5000; i++) {
+    root = { nested: root };
+  }
+  const result = normalizeOutput(root) as unknown;
+  assert.doesNotThrow(() => JSON.stringify(result));
+});
+
+test("normalizeOutput - replaces content past the max depth with a placeholder", () => {
+  let root: Record<string, unknown> = { value: "leaf" };
+  for (let i = 0; i < 200; i++) {
+    root = { nested: root };
+  }
+  const json = JSON.stringify(normalizeOutput(root));
+  assert.ok(json.includes("max depth exceeded"));
+  assert.ok(!json.includes("leaf"));
+});
+
+test("normalizeOutput - shallow objects are unaffected by the depth limit", () => {
+  const result = normalizeOutput({ a: { b: { c: "leaf" } } }) as Record<string, unknown>;
+  assert.deepEqual(result, { a: { b: { c: "leaf" } } });
+});
+
+test("normalizeOutput - detects a circular object reference", () => {
+  const obj: Record<string, unknown> = { name: "root" };
+  obj.self = obj;
+  const result = normalizeOutput(obj) as Record<string, unknown>;
+  assert.equal(result.name, "root");
+  assert.equal(result.self, "[circular reference]");
+});
+
+test("normalizeOutput - detects a circular array reference", () => {
+  const arr: unknown[] = [1, 2];
+  arr.push(arr);
+  const result = normalizeOutput(arr) as unknown[];
+  assert.equal(result[0], 1);
+  assert.equal(result[2], "[circular reference]");
+});
+
+test("normalizeOutput - same object appearing twice (not a cycle) is normalized both times", () => {
+  const shared = { id: 1 };
+  const result = normalizeOutput({ a: shared, b: shared }) as Record<string, unknown>;
+  assert.deepEqual(result.a, { id: 1 });
+  assert.deepEqual(result.b, { id: 1 });
+});

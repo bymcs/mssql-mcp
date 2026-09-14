@@ -1,6 +1,7 @@
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { closePoolOnShutdown } from "../db/connection.js";
+import { formatFatalError } from "../utils/errors.js";
 
 export async function runStdioTransport(server: McpServer): Promise<void> {
   const transport = new StdioServerTransport();
@@ -28,11 +29,11 @@ export async function runStdioTransport(server: McpServer): Promise<void> {
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGUSR2", () => shutdown("SIGUSR2"));
   process.on("uncaughtException", (err) => {
-    console.error("Uncaught exception:", err);
+    console.error("Uncaught exception:", formatFatalError(err));
     shutdown("uncaughtException");
   });
   process.on("unhandledRejection", (reason) => {
-    console.error("Unhandled rejection:", reason);
+    console.error("Unhandled rejection:", formatFatalError(reason));
     shutdown("unhandledRejection");
   });
 
