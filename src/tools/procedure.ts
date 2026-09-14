@@ -1,10 +1,34 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
+import sql from "mssql";
 import { requirePool } from "../db/connection.js";
 import { validateIdentifier, bracketIdentifier } from "../db/validators.js";
 import { toActionableError, toolError, toolSuccess, toolSuccessMarkdown } from "../utils/errors.js";
 import { formatJson } from "../utils/format.js";
 import { formatMarkdownMultiRecordsets } from "../utils/markdown.js";
+
+type ProcedureParams = Record<string, string | number | boolean | null>;
+
+async function executeStoredProcedureCore(
+  pool: sql.ConnectionPool,
+  schemaName: string,
+  procedureName: string,
+  parameters: ProcedureParams | undefined
+) {
+  validateIdentifier(procedureName, "procedure name");
+  validateIdentifier(schemaName, "schema name");
+
+  const qualifiedName = `${bracketIdentifier(schemaName)}.${bracketIdentifier(procedureName)}`;
+  const request = pool.request();
+  if (parameters) {
+    for (const [key, value] of Object.entries(parameters)) {
+      request.input(key, value);
+    }
+  }
+
+  const result = await request.execute(qualifiedName);
+  return { qualifiedName, result };
+}
 
 export function registerProcedureTools(server: McpServer): void {
   server.registerTool(
@@ -16,11 +40,11 @@ export function registerProcedureTools(server: McpServer): void {
         "⚠️ May modify data — use only when an action is intended. " +
         "Schema and procedure names are validated as safe identifiers. " +
         "Pass all value parameters via 'parameters'.",
-      inputSchema: {
+      inputSchema: z.object({
         procedureName: z.string().min(1).describe("Stored procedure name"),
         schemaName: z.string().optional().default("dbo").describe("Schema name (default: dbo)"),
         parameters: z
-          .record(z.union([z.string(), z.number(), z.boolean(), z.null()]))
+          .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
           .optional()
           .describe("Procedure input parameters (key-value pairs)"),
         response_format: z
@@ -28,24 +52,15 @@ export function registerProcedureTools(server: McpServer): void {
           .optional()
           .default("json")
           .describe("Output format: 'json' for structured data, 'markdown' for human-readable tables"),
-      },
+      }),
       annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: true },
     },
     async ({ procedureName, schemaName, parameters, response_format }) => {
       try {
         const pool = requirePool();
-        validateIdentifier(procedureName, "procedure name");
-        validateIdentifier(schemaName, "schema name");
-
-        const qualifiedName = `${bracketIdentifier(schemaName)}.${bracketIdentifier(procedureName)}`;
-        const request = pool.request();
-        if (parameters) {
-          for (const [key, value] of Object.entries(parameters)) {
-            request.input(key, value);
-          }
-        }
-
-        const result = await request.execute(qualifiedName);
+        const { qualifiedName, result } = await executeStoredProcedureCore(
+          pool, schemaName, procedureName, parameters
+        );
         const structured: Record<string, unknown> = {
           recordsets: result.recordsets,
           rows_affected: result.rowsAffected,
@@ -73,29 +88,22 @@ export function registerProcedureTools(server: McpServer): void {
     {
       title: "Execute Procedure (deprecated — use mssql_execute_stored_procedure)",
       description: "Deprecated alias for mssql_execute_stored_procedure.",
-      inputSchema: {
+      inputSchema: z.object({
         procedureName: z.string().describe("Name of the stored procedure"),
         schemaName: z.string().optional().default("dbo"),
         parameters: z
-          .record(z.union([z.string(), z.number(), z.boolean(), z.null()]))
+          .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
           .optional(),
         response_format: z.enum(["json", "markdown"]).optional().default("json"),
-      },
+      }),
       annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: true },
     },
     async ({ procedureName, schemaName, parameters, response_format }) => {
       try {
         const pool = requirePool();
-        validateIdentifier(procedureName, "procedure name");
-        validateIdentifier(schemaName, "schema name");
-        const qualifiedName = `${bracketIdentifier(schemaName)}.${bracketIdentifier(procedureName)}`;
-        const request = pool.request();
-        if (parameters) {
-          for (const [key, value] of Object.entries(parameters)) {
-            request.input(key, value);
-          }
-        }
-        const result = await request.execute(qualifiedName);
+        const { result } = await executeStoredProcedureCore(
+          pool, schemaName, procedureName, parameters
+        );
         const structured: Record<string, unknown> = {
           recordsets: result.recordsets,
           rowsAffected: result.rowsAffected,

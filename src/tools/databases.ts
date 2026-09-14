@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { requirePool } from "../db/connection.js";
 import { toActionableError, toolError, toolSuccess, toolSuccessMarkdown } from "../utils/errors.js";
 import { formatJson } from "../utils/format.js";
@@ -14,7 +14,7 @@ export function registerDatabasesTools(server: McpServer): void {
       description:
         "Lists all databases visible on the connected SQL Server instance with state and recovery information. " +
         "Read-only. Supports pagination.",
-      inputSchema: {
+      inputSchema: z.object({
         limit: z.number().int().min(1).max(200).optional().default(20).describe("Max databases (default 20)"),
         offset: z.number().int().min(0).optional().default(0).describe("Skip N databases"),
         response_format: z
@@ -22,7 +22,7 @@ export function registerDatabasesTools(server: McpServer): void {
           .optional()
           .default("json")
           .describe("Output format: 'json' for structured data, 'markdown' for human-readable table"),
-      },
+      }),
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ limit: rawLimit, offset, response_format }) => {

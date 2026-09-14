@@ -1,13 +1,65 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import sql from "mssql";
 import { requirePool } from "../db/connection.js";
-import { validateIdentifier, bracketIdentifier, validateOrderBy, SAFE_IDENTIFIER_RE } from "../db/validators.js";
+import { validateIdentifier, validateOrderBy, SAFE_IDENTIFIER_RE } from "../db/validators.js";
 import { buildSelectQuery, buildSelectWithWhereQuery } from "../db/query-builders.js";
 import { toActionableError, toolError, toolSuccess, toolSuccessMarkdown } from "../utils/errors.js";
 import { formatJson, truncatePayload } from "../utils/format.js";
 import { formatMarkdownTable } from "../utils/markdown.js";
 import { buildPaginationMeta, clampLimit } from "../utils/pagination.js";
+
+async function fetchTableColumns(
+  pool: sql.ConnectionPool,
+  schemaName: string,
+  tableName: string
+): Promise<unknown[]> {
+  const result = await pool
+    .request()
+    .input("tableName", sql.VarChar, tableName)
+    .input("schemaName", sql.VarChar, schemaName)
+    .query(`
+      SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH,
+        NUMERIC_PRECISION, NUMERIC_SCALE, IS_NULLABLE,
+        COLUMN_DEFAULT, ORDINAL_POSITION
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = @tableName AND TABLE_SCHEMA = @schemaName
+      ORDER BY ORDINAL_POSITION
+    `);
+  return result.recordset ?? [];
+}
+
+type TableRowParams = Record<string, string | number | boolean | null>;
+
+async function fetchTableRows(
+  pool: sql.ConnectionPool,
+  schemaName: string,
+  tableName: string,
+  columns: string[] | null,
+  limit: number,
+  offset: number,
+  whereClause: string | undefined,
+  orderBy: string | undefined,
+  parameters: TableRowParams | undefined
+): Promise<{ data: unknown[]; truncated: boolean; truncation_message?: string; elapsed: number }> {
+  const safeOrderBy = orderBy ? validateOrderBy(orderBy) : null;
+  const query = whereClause
+    ? buildSelectWithWhereQuery(schemaName, tableName, columns, whereClause, safeOrderBy, offset, limit)
+    : buildSelectQuery(schemaName, tableName, columns, safeOrderBy, offset, limit);
+
+  const request = pool.request();
+  if (parameters) {
+    for (const [key, value] of Object.entries(parameters)) {
+      request.input(key, value);
+    }
+  }
+
+  const start = Date.now();
+  const result = await request.query(query);
+  const elapsed = Date.now() - start;
+  const { data, truncated, truncation_message } = truncatePayload(result.recordset ?? []);
+  return { data, truncated, truncation_message, elapsed };
+}
 
 export function registerTableTools(server: McpServer): void {
   server.registerTool(
@@ -17,7 +69,7 @@ export function registerTableTools(server: McpServer): void {
       description:
         "Returns column definitions for a table: name, data type, length, nullability, default, and ordinal position. " +
         "Read-only. Uses parameterized queries to prevent injection.",
-      inputSchema: {
+      inputSchema: z.object({
         tableName: z.string().min(1).describe("Table name"),
         schemaName: z.string().optional().default("dbo").describe("Schema name (default: dbo)"),
         response_format: z
@@ -25,7 +77,7 @@ export function registerTableTools(server: McpServer): void {
           .optional()
           .default("json")
           .describe("Output format: 'json' for structured data, 'markdown' for human-readable table"),
-      },
+      }),
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ tableName, schemaName, response_format }) => {
@@ -34,26 +86,15 @@ export function registerTableTools(server: McpServer): void {
         validateIdentifier(tableName, "table name");
         validateIdentifier(schemaName, "schema name");
 
-        const result = await pool
-          .request()
-          .input("tableName", sql.VarChar, tableName)
-          .input("schemaName", sql.VarChar, schemaName)
-          .query(`
-            SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH,
-              NUMERIC_PRECISION, NUMERIC_SCALE, IS_NULLABLE,
-              COLUMN_DEFAULT, ORDINAL_POSITION
-            FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_NAME = @tableName AND TABLE_SCHEMA = @schemaName
-            ORDER BY ORDINAL_POSITION
-          `);
+        const columns = await fetchTableColumns(pool, schemaName, tableName);
 
         const structured: Record<string, unknown> = {
-          columns: result.recordset,
+          columns,
           table: `${schemaName}.${tableName}`,
         };
 
         if (response_format === "markdown") {
-          const rows = result.recordset as Record<string, unknown>[];
+          const rows = columns as Record<string, unknown>[];
           return toolSuccessMarkdown(
             formatMarkdownTable(rows, `Columns: ${schemaName}.${tableName}`)
           );
@@ -73,11 +114,11 @@ export function registerTableTools(server: McpServer): void {
     {
       title: "Describe Table (deprecated — use mssql_describe_table_columns)",
       description: "Deprecated alias for mssql_describe_table_columns.",
-      inputSchema: {
+      inputSchema: z.object({
         tableName: z.string().min(1),
         schemaName: z.string().optional().default("dbo"),
         response_format: z.enum(["json", "markdown"]).optional().default("json"),
-      },
+      }),
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ tableName, schemaName, response_format }) => {
@@ -85,19 +126,7 @@ export function registerTableTools(server: McpServer): void {
         const pool = requirePool();
         validateIdentifier(tableName, "table name");
         validateIdentifier(schemaName, "schema name");
-        const result = await pool
-          .request()
-          .input("tableName", sql.VarChar, tableName)
-          .input("schemaName", sql.VarChar, schemaName)
-          .query(`
-            SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH,
-              NUMERIC_PRECISION, NUMERIC_SCALE, IS_NULLABLE,
-              COLUMN_DEFAULT, ORDINAL_POSITION
-            FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_NAME = @tableName AND TABLE_SCHEMA = @schemaName
-            ORDER BY ORDINAL_POSITION
-          `);
-        const rows = result.recordset ?? [];
+        const rows = await fetchTableColumns(pool, schemaName, tableName);
         if (response_format === "markdown") {
           return toolSuccessMarkdown(formatMarkdownTable(rows as Record<string, unknown>[]));
         }
@@ -120,7 +149,7 @@ export function registerTableTools(server: McpServer): void {
         "WHERE clause values MUST be passed via 'parameters' using @paramName placeholders. " +
         "Pagination: limit (1-200, default 20) and offset. " +
         "Example: tableName='Orders', schemaName='dbo', columns=['OrderId','Total'], limit=50",
-      inputSchema: {
+      inputSchema: z.object({
         tableName: z
           .string()
           .min(1)
@@ -150,7 +179,7 @@ export function registerTableTools(server: McpServer): void {
           .optional()
           .describe("ORDER BY expression. Example: 'CreatedAt DESC, Id ASC'"),
         parameters: z
-          .record(z.union([z.string(), z.number(), z.boolean(), z.null()]))
+          .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
           .optional()
           .describe("Values for WHERE clause @paramName placeholders"),
         response_format: z
@@ -158,7 +187,7 @@ export function registerTableTools(server: McpServer): void {
           .optional()
           .default("json")
           .describe("Output format: 'json' for structured data, 'markdown' for human-readable table"),
-      },
+      }),
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ tableName, schemaName, columns, limit: rawLimit, offset, whereClause, orderBy, parameters, response_format }) => {
@@ -167,24 +196,10 @@ export function registerTableTools(server: McpServer): void {
         validateIdentifier(tableName, "table name");
         validateIdentifier(schemaName, "schema name");
         const limit = clampLimit(rawLimit);
-        const safeOrderBy = orderBy ? validateOrderBy(orderBy) : null;
 
-        const query = whereClause
-          ? buildSelectWithWhereQuery(schemaName, tableName, columns ?? null, whereClause, safeOrderBy, offset, limit)
-          : buildSelectQuery(schemaName, tableName, columns ?? null, safeOrderBy, offset, limit);
-
-        const request = pool.request();
-        if (parameters) {
-          for (const [key, value] of Object.entries(parameters)) {
-            request.input(key, value);
-          }
-        }
-
-        const start = Date.now();
-        const result = await request.query(query);
-        const elapsed = Date.now() - start;
-
-        const { data, truncated, truncation_message } = truncatePayload(result.recordset ?? []);
+        const { data, truncated, truncation_message, elapsed } = await fetchTableRows(
+          pool, schemaName, tableName, columns ?? null, limit, offset, whereClause, orderBy, parameters
+        );
         const pagination = buildPaginationMeta(data.length, limit, offset);
 
         const structured: Record<string, unknown> = {
@@ -222,7 +237,7 @@ export function registerTableTools(server: McpServer): void {
       description:
         "Deprecated alias for mssql_read_table_rows. Use mssql_read_table_rows instead. " +
         "⚠️ whereClause must use @paramName placeholders for all values.",
-      inputSchema: {
+      inputSchema: z.object({
         tableName: z
           .string()
           .min(1)
@@ -237,10 +252,10 @@ export function registerTableTools(server: McpServer): void {
         whereClause: z.string().optional(),
         orderBy: z.string().optional(),
         parameters: z
-          .record(z.union([z.string(), z.number(), z.boolean(), z.null()]))
+          .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
           .optional(),
         response_format: z.enum(["json", "markdown"]).optional().default("json"),
-      },
+      }),
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ tableName, schemaName, limit: rawLimit, offset, whereClause, orderBy, parameters, response_format }) => {
@@ -249,24 +264,10 @@ export function registerTableTools(server: McpServer): void {
         validateIdentifier(tableName, "table name");
         validateIdentifier(schemaName, "schema name");
         const limit = clampLimit(rawLimit);
-        const safeOrderBy = orderBy ? validateOrderBy(orderBy) : null;
 
-        const query = whereClause
-          ? buildSelectWithWhereQuery(schemaName, tableName, null, whereClause, safeOrderBy, offset, limit)
-          : buildSelectQuery(schemaName, tableName, null, safeOrderBy, offset, limit);
-
-        const request = pool.request();
-        if (parameters) {
-          for (const [key, value] of Object.entries(parameters)) {
-            request.input(key, value);
-          }
-        }
-
-        const start = Date.now();
-        const result = await request.query(query);
-        const elapsed = Date.now() - start;
-
-        const { data, truncated, truncation_message } = truncatePayload(result.recordset ?? []);
+        const { data, truncated, truncation_message, elapsed } = await fetchTableRows(
+          pool, schemaName, tableName, null, limit, offset, whereClause, orderBy, parameters
+        );
         const pagination = buildPaginationMeta(data.length, limit, offset);
 
         const structured: Record<string, unknown> = {
