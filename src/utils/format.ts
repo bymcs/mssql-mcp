@@ -100,12 +100,24 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
     && !(value instanceof Date);
 }
 
+// Bounds how deep normalizeOutput will recurse into nested arrays/objects
+// (e.g. a deeply nested JSON/XML column value) and guards against circular
+// references. Without this, a pathological result shape can recurse until
+// the call stack overflows, and V8 stack-trace symbolication for an error
+// thrown from such a deep stack is itself extremely expensive — see
+// https://github.com/BYMCS/mssql-mcp/issues/5.
+const MAX_NORMALIZE_DEPTH = 50;
+const MAX_DEPTH_PLACEHOLDER = "[max depth exceeded]";
+const CIRCULAR_PLACEHOLDER = "[circular reference]";
+
 function normalizeRecordRow(
   row: Record<string, unknown>,
-  columns: ColumnMetadata
+  columns: ColumnMetadata,
+  seen: Set<unknown>,
+  depth: number
 ): Record<string, unknown> {
   return Object.fromEntries(
-    Object.entries(row).map(([key, value]) => [key, normalizeOutput(value, columns[key])])
+    Object.entries(row).map(([key, value]) => [key, normalizeOutput(value, columns[key], seen, depth)])
   );
 }
 
@@ -126,27 +138,43 @@ export function formatDisplayValue(value: unknown, column?: { type?: unknown; sc
 
 export function normalizeOutput(
   value: unknown,
-  column?: { type?: unknown; scale?: number }
+  column?: { type?: unknown; scale?: number },
+  seen: Set<unknown> = new Set(),
+  depth = 0
 ): unknown {
   if (value instanceof Date) {
     return formatDateValue(value, column);
   }
 
-  const columns = getRecordsetColumns(value);
-  if (Array.isArray(value)) {
-    if (columns) {
-      return value.map((row) => isPlainObject(row) ? normalizeRecordRow(row, columns) : normalizeOutput(row));
+  if (!Array.isArray(value) && !isPlainObject(value)) {
+    return value;
+  }
+
+  if (depth >= MAX_NORMALIZE_DEPTH) {
+    return MAX_DEPTH_PLACEHOLDER;
+  }
+  if (seen.has(value)) {
+    return CIRCULAR_PLACEHOLDER;
+  }
+
+  seen.add(value);
+  try {
+    const columns = getRecordsetColumns(value);
+    if (Array.isArray(value)) {
+      if (columns) {
+        return value.map((row) =>
+          isPlainObject(row) ? normalizeRecordRow(row, columns, seen, depth + 1) : normalizeOutput(row, undefined, seen, depth + 1)
+        );
+      }
+      return value.map((entry) => normalizeOutput(entry, undefined, seen, depth + 1));
     }
-    return value.map((entry) => normalizeOutput(entry));
-  }
 
-  if (isPlainObject(value)) {
     return Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [key, normalizeOutput(entry)])
+      Object.entries(value).map(([key, entry]) => [key, normalizeOutput(entry, undefined, seen, depth + 1)])
     );
+  } finally {
+    seen.delete(value);
   }
-
-  return value;
 }
 
 export function truncatePayload(

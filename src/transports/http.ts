@@ -7,6 +7,7 @@ import {
 } from "@modelcontextprotocol/node";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { closePoolOnShutdown } from "../db/connection.js";
+import { formatFatalError } from "../utils/errors.js";
 import type { HttpConfig } from "../config.js";
 
 export async function runHttpTransport(server: McpServer, config: HttpConfig): Promise<void> {
@@ -39,11 +40,11 @@ export async function runHttpTransport(server: McpServer, config: HttpConfig): P
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGUSR2", () => shutdown("SIGUSR2"));
   process.on("uncaughtException", (err) => {
-    console.error("Uncaught exception:", err);
+    console.error("Uncaught exception:", formatFatalError(err));
     shutdown("uncaughtException");
   });
   process.on("unhandledRejection", (reason) => {
-    console.error("Unhandled rejection:", reason);
+    console.error("Unhandled rejection:", formatFatalError(reason));
     shutdown("unhandledRejection");
   });
 
