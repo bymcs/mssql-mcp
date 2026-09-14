@@ -1,4 +1,4 @@
-# MS SQL Server MCP Server v2.3.6
+# MS SQL Server MCP Server v3.0.0
 
 🚀 **Model Context Protocol (MCP) server** for Microsoft SQL Server - compatible with Claude Desktop, Cursor, Windsurf and VS Code.
 
@@ -11,7 +11,8 @@
 - Protocol target: [MCP draft/latest spec](https://modelcontextprotocol.io/specification/draft/server/tools)
 - Transport spec: [Transports](https://modelcontextprotocol.io/specification/draft/basic/transports)
 - Security: [Security best practices](https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices)
-- SDK: `@modelcontextprotocol/sdk` pinned to `1.28.0`
+- SDK: `@modelcontextprotocol/sdk` pinned to `1.30.0`
+- Requires Node.js >= 20
 
 ## 🚀 Quick Start
 
@@ -96,24 +97,19 @@ npm install -g mssql-mcp
 
 All data tools accept a `response_format` parameter (`"json"` | `"markdown"`, default `"json"`). Use `"markdown"` to get human-readable table output.
 
-### Deprecated aliases (still work for backward compatibility)
+### Deprecated aliases (still registered for backward compatibility)
+
+These are the only alias tool names the server actually registers (in `src/tools/*.ts`).
+They behave the same as their replacement but are not documented in new integrations —
+use the primary tool names above instead.
 
 | Old name | Use instead |
 |----------|-------------|
-| `connect_database` | `mssql_connect_database` |
-| `disconnect_database` | `mssql_disconnect_database` |
-| `connection_status` | `mssql_connection_status` |
-| `execute_query` | `mssql_run_sql_query` |
-| `run_sql_query` | `mssql_run_sql_query` |
-| `get_schema` | `mssql_list_schema_objects` |
-| `list_schema_objects` | `mssql_list_schema_objects` |
-| `describe_table` | `mssql_describe_table_columns` |
-| `describe_table_columns` | `mssql_describe_table_columns` |
-| `get_table_data` | `mssql_read_table_rows` |
-| `read_table_rows` | `mssql_read_table_rows` |
-| `execute_procedure` | `mssql_execute_stored_procedure` |
-| `execute_stored_procedure` | `mssql_execute_stored_procedure` |
-| `list_databases` | `mssql_list_databases` |
+| `mssql_execute_query` | `mssql_run_sql_query` |
+| `mssql_get_schema` | `mssql_list_schema_objects` |
+| `mssql_describe_table` | `mssql_describe_table_columns` |
+| `mssql_get_table_data` | `mssql_read_table_rows` |
+| `mssql_execute_procedure` | `mssql_execute_stored_procedure` |
 
 ## 🚌 Transport Modes
 
@@ -230,10 +226,11 @@ Expected:
 
 ```bash
 npm install
-npm run typecheck   # type check only
-npm run build       # compile TypeScript
-npm test            # run unit tests
-npm run ci          # typecheck + build + test
+cp .env.example .env  # fill in your test DB credentials
+npm run typecheck     # type check only
+npm run build         # compile TypeScript
+npm test              # run unit tests
+npm run ci            # typecheck + build + test
 ```
 
 ## License

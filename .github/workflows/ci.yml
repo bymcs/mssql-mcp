@@ -11,7 +11,24 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18.x, 20.x, 22.x]
+        node-version: [20.x, 22.x, 24.x]
+
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: ${{ secrets.CI_SQL_SA_PASSWORD || 'P@ssw0rd_CI_2024!' }}
+        ports:
+          - 1433:1433
+
+    env:
+      DB_SERVER: localhost
+      DB_PORT: 1433
+      DB_USER: sa
+      DB_PASSWORD: ${{ secrets.CI_SQL_SA_PASSWORD || 'P@ssw0rd_CI_2024!' }}
+      DB_ENCRYPT: "true"
+      DB_TRUST_SERVER_CERTIFICATE: "true"
 
     steps:
       - uses: actions/checkout@v4
@@ -33,6 +50,9 @@ jobs:
 
       - name: Test
         run: npm test
+
+      - name: Integration test (live SQL Server)
+        run: npm run test:integration
 
       - name: Verify package
         run: npm pack --dry-run
