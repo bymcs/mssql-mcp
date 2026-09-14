@@ -9,8 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- Upgraded `@modelcontextprotocol/sdk` to `1.30.0`, `mssql` to `^12.7.2`, `zod` to
-  `^4.6.5`, `typescript` to `^5.9.3`, and `@types/node` to `^22.0.0`.
+- Migrated from `@modelcontextprotocol/sdk` (v1) to the **MCP TypeScript SDK v2**
+  (`@modelcontextprotocol/server` / `@modelcontextprotocol/client` /
+  `@modelcontextprotocol/node`, all `2.0.0`), which targets the 2026-07-28 MCP
+  spec. Import paths changed throughout `src/`; the HTTP transport was rewritten
+  on top of `NodeStreamableHTTPServerTransport`, and now validates both the
+  `Origin` and `Host` headers (via `@modelcontextprotocol/node`'s
+  `originValidation`/`hostHeaderValidation` helpers) instead of a hand-rolled
+  Origin check. All tool `inputSchema`s were migrated from the deprecated
+  raw-shape form (`{ field: z.string() }`) to `z.object({ ... })`.
+- Upgraded `mssql` to `^12.7.2`, `zod` to `^4.6.5`, `typescript` to `^5.9.3`, and
+  `@types/node` to `^22.0.0`.
 - Raised the minimum supported Node.js version to `>=20.0.0` (Node 18 is end of
   life); CI now tests against Node 20.x, 22.x, and 24.x instead of 18.x/20.x/22.x.
 - Migrated `z.record()` calls to zod v4's two-argument form

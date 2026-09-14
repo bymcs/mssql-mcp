@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import sql from "mssql";
 import { requirePool } from "../db/connection.js";
 import { validateIdentifier, bracketIdentifier } from "../db/validators.js";
@@ -40,7 +40,7 @@ export function registerProcedureTools(server: McpServer): void {
         "⚠️ May modify data — use only when an action is intended. " +
         "Schema and procedure names are validated as safe identifiers. " +
         "Pass all value parameters via 'parameters'.",
-      inputSchema: {
+      inputSchema: z.object({
         procedureName: z.string().min(1).describe("Stored procedure name"),
         schemaName: z.string().optional().default("dbo").describe("Schema name (default: dbo)"),
         parameters: z
@@ -52,7 +52,7 @@ export function registerProcedureTools(server: McpServer): void {
           .optional()
           .default("json")
           .describe("Output format: 'json' for structured data, 'markdown' for human-readable tables"),
-      },
+      }),
       annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: true },
     },
     async ({ procedureName, schemaName, parameters, response_format }) => {
@@ -88,14 +88,14 @@ export function registerProcedureTools(server: McpServer): void {
     {
       title: "Execute Procedure (deprecated — use mssql_execute_stored_procedure)",
       description: "Deprecated alias for mssql_execute_stored_procedure.",
-      inputSchema: {
+      inputSchema: z.object({
         procedureName: z.string().describe("Name of the stored procedure"),
         schemaName: z.string().optional().default("dbo"),
         parameters: z
           .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
           .optional(),
         response_format: z.enum(["json", "markdown"]).optional().default("json"),
-      },
+      }),
       annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: true },
     },
     async ({ procedureName, schemaName, parameters, response_format }) => {

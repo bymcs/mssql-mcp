@@ -11,7 +11,7 @@
 - Protocol target: [MCP draft/latest spec](https://modelcontextprotocol.io/specification/draft/server/tools)
 - Transport spec: [Transports](https://modelcontextprotocol.io/specification/draft/basic/transports)
 - Security: [Security best practices](https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices)
-- SDK: `@modelcontextprotocol/sdk` pinned to `1.30.0`
+- SDK: `@modelcontextprotocol/server` / `@modelcontextprotocol/client` / `@modelcontextprotocol/node` v2 (`2.0.0`), targeting the 2026-07-28 MCP spec
 - Requires Node.js >= 20
 
 ## 🚀 Quick Start
@@ -158,7 +158,7 @@ MCP_TRANSPORT=http MCP_HOST=0.0.0.0 MCP_PORT=8080 node dist/src/index.js
 - **No credential parameters**: All connection settings come from environment variables only. Tool inputs cannot override connection config.
 - **Identifier validation**: Schema, table, and procedure names are validated against a safe identifier pattern before interpolation into SQL.
 - **Parameterized queries**: All user-supplied values (WHERE clause values, column values) must be passed as named parameters via `@paramName` — never embedded in query strings.
-- **Origin validation**: HTTP transport validates `Origin` header and only allows localhost by default.
+- **Origin and Host validation**: HTTP transport validates both the `Origin` and `Host` headers against an allowlist (localhost, `[::1]`, and the configured bind host by default), guarding against DNS rebinding.
 - **SQL risk labeling**: `run_sql_query` and `execute_stored_procedure` are explicitly labeled as non-read-only and open-world.
 
 ### ⚠️ SQL Risk Notes

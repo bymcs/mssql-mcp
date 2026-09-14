@@ -1,5 +1,5 @@
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { closePoolOnShutdown } from "../db/connection.js";
 
 export async function runStdioTransport(server: McpServer): Promise<void> {

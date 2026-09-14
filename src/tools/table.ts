@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import sql from "mssql";
 import { requirePool } from "../db/connection.js";
 import { validateIdentifier, validateOrderBy, SAFE_IDENTIFIER_RE } from "../db/validators.js";
@@ -69,7 +69,7 @@ export function registerTableTools(server: McpServer): void {
       description:
         "Returns column definitions for a table: name, data type, length, nullability, default, and ordinal position. " +
         "Read-only. Uses parameterized queries to prevent injection.",
-      inputSchema: {
+      inputSchema: z.object({
         tableName: z.string().min(1).describe("Table name"),
         schemaName: z.string().optional().default("dbo").describe("Schema name (default: dbo)"),
         response_format: z
@@ -77,7 +77,7 @@ export function registerTableTools(server: McpServer): void {
           .optional()
           .default("json")
           .describe("Output format: 'json' for structured data, 'markdown' for human-readable table"),
-      },
+      }),
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ tableName, schemaName, response_format }) => {
@@ -114,11 +114,11 @@ export function registerTableTools(server: McpServer): void {
     {
       title: "Describe Table (deprecated — use mssql_describe_table_columns)",
       description: "Deprecated alias for mssql_describe_table_columns.",
-      inputSchema: {
+      inputSchema: z.object({
         tableName: z.string().min(1),
         schemaName: z.string().optional().default("dbo"),
         response_format: z.enum(["json", "markdown"]).optional().default("json"),
-      },
+      }),
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ tableName, schemaName, response_format }) => {
@@ -149,7 +149,7 @@ export function registerTableTools(server: McpServer): void {
         "WHERE clause values MUST be passed via 'parameters' using @paramName placeholders. " +
         "Pagination: limit (1-200, default 20) and offset. " +
         "Example: tableName='Orders', schemaName='dbo', columns=['OrderId','Total'], limit=50",
-      inputSchema: {
+      inputSchema: z.object({
         tableName: z
           .string()
           .min(1)
@@ -187,7 +187,7 @@ export function registerTableTools(server: McpServer): void {
           .optional()
           .default("json")
           .describe("Output format: 'json' for structured data, 'markdown' for human-readable table"),
-      },
+      }),
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ tableName, schemaName, columns, limit: rawLimit, offset, whereClause, orderBy, parameters, response_format }) => {
@@ -237,7 +237,7 @@ export function registerTableTools(server: McpServer): void {
       description:
         "Deprecated alias for mssql_read_table_rows. Use mssql_read_table_rows instead. " +
         "⚠️ whereClause must use @paramName placeholders for all values.",
-      inputSchema: {
+      inputSchema: z.object({
         tableName: z
           .string()
           .min(1)
@@ -255,7 +255,7 @@ export function registerTableTools(server: McpServer): void {
           .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
           .optional(),
         response_format: z.enum(["json", "markdown"]).optional().default("json"),
-      },
+      }),
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ tableName, schemaName, limit: rawLimit, offset, whereClause, orderBy, parameters, response_format }) => {
