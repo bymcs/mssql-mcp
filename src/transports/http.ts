@@ -1,34 +1,30 @@
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import {
+  NodeStreamableHTTPServerTransport,
+  originValidation,
+  hostHeaderValidation,
+} from "@modelcontextprotocol/node";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { closePoolOnShutdown } from "../db/connection.js";
 import type { HttpConfig } from "../config.js";
 
 export async function runHttpTransport(server: McpServer, config: HttpConfig): Promise<void> {
-  const transport = new StreamableHTTPServerTransport({
+  const transport = new NodeStreamableHTTPServerTransport({
     sessionIdGenerator: () => randomUUID(),
   });
 
-  const httpServer = createServer((req, res) => {
-    // Origin validation: only allow localhost by default
-    const origin = req.headers["origin"];
-    if (origin) {
-      const allowed = [
-        "http://localhost",
-        "http://127.0.0.1",
-        `http://${config.host}`,
-        `http://${config.host}:${config.port}`,
-      ];
-      const isAllowed = allowed.some((o) => origin.startsWith(o));
-      if (!isAllowed) {
-        res.writeHead(403, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Forbidden: origin not allowed" }));
-        return;
-      }
-    }
+  // Only allow localhost and the configured bind host by default, per the MCP
+  // HTTP transport security guidance (Origin + Host header checks guard
+  // against DNS rebinding).
+  const allowedHostnames = ["localhost", "127.0.0.1", "[::1]", config.host];
+  const validateOrigin = originValidation(allowedHostnames);
+  const validateHost = hostHeaderValidation(allowedHostnames);
 
-    transport.handleRequest(req, res);
+  const httpServer = createServer((req, res) => {
+    if (!validateHost(req, res)) return;
+    if (!validateOrigin(req, res)) return;
+    void transport.handleRequest(req, res);
   });
 
   const shutdown = async (signal: string) => {

@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import { SERVER_NAME, SERVER_VERSION } from "./constants.js";
 import { registerConnectTools } from "./tools/connect.js";
 import { registerStatusTool } from "./tools/status.js";

@@ -24,6 +24,10 @@ export async function connectPool(config: DatabaseConfig): Promise<void> {
       encrypt: config.encrypt,
       trustServerCertificate: config.trustServerCertificate,
       enableArithAbort: true,
+      // Read date/time columns using the server's local clock rather than UTC, so
+      // values round-trip as the server intends them (SQL Server datetime/datetime2
+      // has no timezone). `datetimeoffset` values are still normalized to UTC
+      // explicitly in utils/format.ts, since that type is timezone-aware.
       useUTC: false,
     },
     connectionTimeout: config.connectionTimeout,

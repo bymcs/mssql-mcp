@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { getConnectionState } from "../db/connection.js";
 
 export function registerConnectionResource(server: McpServer): void {

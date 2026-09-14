@@ -1,4 +1,5 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { getConnectionState } from "../db/connection.js";
 import { toolSuccess } from "../utils/errors.js";
 import { formatJson } from "../utils/format.js";
@@ -11,7 +12,7 @@ export function registerStatusTool(server: McpServer): void {
       description:
         "Returns the current connection status, server address, database name, and connection pool metrics. " +
         "Read-only. Safe to call at any time.",
-      inputSchema: {},
+      inputSchema: z.object({}),
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
     async () => {
