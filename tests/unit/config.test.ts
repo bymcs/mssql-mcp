@@ -126,8 +126,10 @@ test("loadConfigFromEnv - throws when DB_SERVER not set", () => {
 test("loadConfigFromEnv - reads DB_SERVER and applies defaults", () => {
   const savedServer = process.env.DB_SERVER;
   const savedEncrypt = process.env.DB_ENCRYPT;
+  const savedTrustCert = process.env.DB_TRUST_SERVER_CERTIFICATE;
   process.env.DB_SERVER = "myserver";
   delete process.env.DB_ENCRYPT;
+  delete process.env.DB_TRUST_SERVER_CERTIFICATE;
   try {
     const config = loadConfigFromEnv();
     assert.equal(config.server, "myserver");
@@ -137,6 +139,8 @@ test("loadConfigFromEnv - reads DB_SERVER and applies defaults", () => {
   } finally {
     if (savedServer !== undefined) process.env.DB_SERVER = savedServer;
     else delete process.env.DB_SERVER;
+    if (savedTrustCert !== undefined) process.env.DB_TRUST_SERVER_CERTIFICATE = savedTrustCert;
+    else delete process.env.DB_TRUST_SERVER_CERTIFICATE;
     if (savedEncrypt !== undefined) process.env.DB_ENCRYPT = savedEncrypt;
   }
 });
