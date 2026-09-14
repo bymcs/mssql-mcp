@@ -1,4 +1,5 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { loadConfigFromEnv } from "../config.js";
 import { connectPool, disconnectPool, getConnectionState } from "../db/connection.js";
 import { toActionableError, toolError, toolSuccess } from "../utils/errors.js";
@@ -12,7 +13,7 @@ export function registerConnectTools(server: McpServer): void {
         "Connects to MS SQL Server using environment variables (DB_SERVER, DB_DATABASE, DB_USER, DB_PASSWORD, " +
         "DB_PORT, DB_ENCRYPT, DB_TRUST_SERVER_CERTIFICATE). No credentials accepted as parameters — all " +
         "connection settings come from the server environment only. Idempotent: calling again reconnects.",
-      inputSchema: {},
+      inputSchema: z.object({}),
       annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {
@@ -39,7 +40,7 @@ export function registerConnectTools(server: McpServer): void {
       description:
         "Closes the current database connection and releases the connection pool. " +
         "Safe to call even if not connected. Idempotent.",
-      inputSchema: {},
+      inputSchema: z.object({}),
       annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {

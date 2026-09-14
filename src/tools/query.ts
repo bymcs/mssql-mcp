@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { requirePool } from "../db/connection.js";
 import { toActionableError, toolError, toolSuccess, toolSuccessMarkdown } from "../utils/errors.js";
 import { formatJson, truncatePayload } from "../utils/format.js";
@@ -62,7 +62,7 @@ export function registerQueryTools(server: McpServer): void {
         "Always prefer parameterized inputs via the 'parameters' field — never embed user-supplied values " +
         "directly in the query string. " +
         "Example: query='SELECT * FROM dbo.Users WHERE Id = @id', parameters={id: 42}",
-      inputSchema: {
+      inputSchema: z.object({
         query: z.string().min(1).describe("SQL statement to execute"),
         parameters: z
           .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
@@ -73,7 +73,7 @@ export function registerQueryTools(server: McpServer): void {
           .optional()
           .default("json")
           .describe("Output format: 'json' for structured data, 'markdown' for human-readable table"),
-      },
+      }),
       annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: true },
     },
     ({ query, parameters, response_format }) =>
@@ -88,14 +88,14 @@ export function registerQueryTools(server: McpServer): void {
       description:
         "Deprecated alias for mssql_run_sql_query. Use mssql_run_sql_query instead. " +
         "⚠️ This tool can read AND modify data.",
-      inputSchema: {
+      inputSchema: z.object({
         query: z.string().min(1).describe("SQL query to execute"),
         parameters: z
           .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
           .optional()
           .describe("Query parameters"),
         response_format: z.enum(["json", "markdown"]).optional().default("json"),
-      },
+      }),
       annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: true },
     },
     ({ query, parameters, response_format }) =>

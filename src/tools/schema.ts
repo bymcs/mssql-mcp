@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import sql from "mssql";
 import { requirePool } from "../db/connection.js";
 import { buildSchemaObjectsQuery } from "../db/query-builders.js";
@@ -33,7 +33,7 @@ export function registerSchemaTools(server: McpServer): void {
         "Lists tables, views, stored procedures, or functions in the connected database. " +
         "Read-only. Supports filtering by schema name and pagination. " +
         "Example: objectType='tables', schemaName='dbo', limit=20",
-      inputSchema: {
+      inputSchema: z.object({
         objectType: z
           .enum(["tables", "views", "procedures", "functions", "all"])
           .optional()
@@ -50,7 +50,7 @@ export function registerSchemaTools(server: McpServer): void {
           .optional()
           .default("json")
           .describe("Output format: 'json' for structured data, 'markdown' for human-readable table"),
-      },
+      }),
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ objectType, schemaName, limit: rawLimit, offset, response_format }) => {
@@ -84,14 +84,14 @@ export function registerSchemaTools(server: McpServer): void {
     {
       title: "Get Schema (deprecated — use mssql_list_schema_objects)",
       description: "Deprecated alias for mssql_list_schema_objects. Use mssql_list_schema_objects instead.",
-      inputSchema: {
+      inputSchema: z.object({
         objectType: z
           .enum(["tables", "views", "procedures", "functions", "all"])
           .optional()
           .default("tables"),
         schemaName: z.string().optional(),
         response_format: z.enum(["json", "markdown"]).optional().default("json"),
-      },
+      }),
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ objectType, schemaName, response_format }) => {
